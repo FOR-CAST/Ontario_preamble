@@ -1,0 +1,122 @@
+---
+title: "Ontario_preamble"
+author: "achubaty"
+date: "30 October 2020"
+output: pdf_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = "hold")
+```
+
+# Overview
+
+Provide an overview of what the module does / how to use the module.
+
+Module documentation should be written so that others can use your module.
+This is a template for module documentation, and should be changed to reflect your module.
+
+## R Markdown
+
+R Markdown syntax allows R code, outputs, and figures to be rendered in the documentation.
+
+For help writing in R Markdown, see https://rmarkdown.rstudio.com/.
+
+# Usage
+
+```{r module_usage}
+library(SpaDES.core)
+
+setPaths(modulePath = file.path("/home/achubaty/Documents/GitHub/FOR-CAST/Ontario_AOU/modules"))
+getPaths() # shows where the 4 relevant paths are
+
+times <- list(start = 0, end = 10)
+
+parameters <- list(
+  #.progress = list(type = "text", interval = 1), # for a progress bar
+  ## If there are further modules, each can have its own set of parameters:
+  #module1 = list(param1 = value1, param2 = value2),
+  #module2 = list(param1 = value1, param2 = value2)
+)
+modules <- list("Ontario_preamble")
+objects <- list()
+inputs <- list()
+outputs <- list()
+
+mySim <- simInit(times = times, params = parameters, modules = modules,
+                 objects = objects)
+
+mySimOut <- spades(mySim)
+```
+
+# Parameters
+
+Provide a summary of user-visible parameters.
+
+```{r moduleParams, echo = FALSE}
+df_params <- moduleParams("Ontario_preamble", "/home/achubaty/Documents/GitHub/FOR-CAST/Ontario_AOU/modules")
+knitr::kable(df_params)
+```
+
+# Events
+
+Describe what happens for each event type.
+
+## Plotting
+
+Write what is plotted.
+
+## Saving
+
+Write what is saved.
+
+# Data dependencies
+
+## Input data
+
+How to obtain input data, and a description of the data required by the module.
+If `sourceURL` is specified, `downloadData("Ontario_preamble", "/home/achubaty/Documents/GitHub/FOR-CAST/Ontario_AOU/modules")` may be sufficient.
+
+```{r moduleInputs, echo = FALSE}
+df_inputs <- moduleInputs("Ontario_preamble", "/home/achubaty/Documents/GitHub/FOR-CAST/Ontario_AOU/modules")
+knitr::kable(df_inputs)
+```
+
+### Historic and projected climate data
+
+`ClimateNA` was used to get monthly historic and projected climate variables for Ontario.
+
+1. DEM from GEOTOPO15 product
+2. Climate data using ClimateNA with projected CCSM4 RCP 4.5 and 8.5
+3. Assemble MDC raster stacks using:
+
+```{r makeMDC, echo = TRUE, eval=FALSE}
+#install_github('PredictiveEcology/climateData@development')
+
+library(raster)
+library(climateData)
+
+mdc_historic <- makeMDC("~/data/climate/ClimateNA_data/historic_1991-2019/Ontario", 1991:2019)
+writeRaster(mdc_historic, "~/GitHub/FOR-CAST/Ontario_AOU/inputs/mdc_historic_1991-2019.grd")
+
+mdc_future45 <- makeMDC("~/data/climate/ClimateNA_data/future_2011-2100/CCSM4_RCP45/Ontario", 2011:2100)
+writeRaster(mdc_future45, "~/GitHub/FOR-CAST/Ontario_AOU/inputs/mdc_future_CCSM4_RCP45_2011-2100.grd")
+
+mdc_future85 <- makeMDC("~/data/climate/ClimateNA_data/future_2011-2100/CCSM4_RCP85/Ontario", 2011:2100)
+writeRaster(mdc_future85, "~/GitHub/FOR-CAST/Ontario_AOU/inputs/mdc_future_CCSM4_RCP85_2011-2100.grd")
+```
+
+## Output data
+
+Description of the module outputs.
+
+```{r moduleOutputs, echo = FALSE}
+df_outputs <- moduleOutputs("Ontario_preamble", "/home/achubaty/Documents/GitHub/FOR-CAST/Ontario_AOU/modules")
+knitr::kable(df_outputs)
+```
+
+# Links to other modules
+
+Describe any anticipated linkages to other modules.
