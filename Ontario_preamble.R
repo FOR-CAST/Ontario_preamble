@@ -62,9 +62,19 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
     plot = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
-      plot(as_Spatial(mod$ON))
-      plot(sim$studyArea, add = TRUE, col = "lightblue")
-      plot(sim$studyAreaLarge, add = TRUE)
+      ON <- as_Spatial(mod$ON)
+
+      Plot(sim$studyArea)
+      Plot(ON, addTo = "sim$studyArea")
+
+      Plot(sim$studyAreaLarge)
+      Plot(ON, addTo = "sim$studyAreaLarge")
+
+      Plot(sim$rasterToMatch)
+      #Plot(ON, addTo = "sim$rasterToMatch")
+
+      Plot(sim$rasterToMatchLarge)
+      #Plot(ON, addTo = "sim$rasterToMatchLarge")
 
       # schedule future event(s)
       #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "Ontario_preamble", "plot")
@@ -97,6 +107,14 @@ Init <- function(sim) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
+  studyAreaName <- if (grepl("AOU", runName)) {
+    "AOU"
+  } else if (grepl("ROF", runName)) {
+    "ROF"
+  } else {
+    stop("runName must contain one of 'AOU' or 'ROF'.")
+  }
+
   ## provincial boundary
   canProvs <- Cache(prepInputs,
                     "GADM",
@@ -106,7 +124,6 @@ Init <- function(sim) {
                     #sim$targetCRS = targetCRS, ## TODO: fails on Windows
                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
                     overwrite = TRUE,
-                    cacheRepo = cacheDir,
                     destinationPath = dPath) %>%
     st_as_sf(.)
 
@@ -162,30 +179,31 @@ Init <- function(sim) {
   sim$rasterToMatch <- LandR::prepInputsLCC(studyArea = sim$studyArea,
                                             destinationPath = dPath,
                                             useCache = P(sim)$.useCache,
-                                            filename2 = paste0(P(sim)$studyAreaName, '_rtm.tif'))
+                                            filename2 = paste0(studyAreaName, '_rtm.tif'))
   sim$rasterToMatchLarge <- LandR::prepInputsLCC(studyArea = sim$studyAreaLarge,
                                                  destinationPath = dPath,
                                                  useCache = P(sim)$.useCache,
-                                                 filename2 = paste0(P(sim)$studyAreaName, '_rtml.tif'))
+                                                 filename2 = paste0(studyAreaName, '_rtml.tif'))
 
   ## CLIMATE DATA (used by fireSense)
   historicalClimateUrl <- "https://drive.google.com/file/d/1ZsppgYeIYsrcScvetoLJNjuA0E5IwhkM"
-  historicalMDC <- prepInputs(url = historicalClimateUrl,
+  historicalMDC <- prepInputs(url = historicalClimateUrl, ## TODO: put all 3 steps into a single prepInputs call
                               destinationPath = dPath,
                               # rasterToMatch = sim$rasterToMatch,
                               # studyArea = sim$studyArea,
                               fun = 'raster::stack',
-                              filename2 = paste0(P(sim)$studyAreaName, '_histClim.grd'),
+                              filename2 = paste0(studyAreaName, '_histClim.grd'),
                               useCache = TRUE,
                               userTags = c("histMDC", cacheTags))
   historicalMDC <- Cache(raster::projectRaster, historicalMDC, to = sim$rasterToMatch,
                          datatype = 'INT2U',
-                         userTags = c("reprojHistoricClimateRasters"))
+                         userTags = c("reprojHistoricClimateRasters", cacheTags)) %>%
+    raster::stack(.)
   historicalMDC <- Cache(raster::mask, historicalMDC, sim$studyArea,
                          userTags = c("maskHistoricClimateRasters"),
-                         filename = file.path(dPath, paste0(P(sim)$studyAreaName, '_histMDC.grd')),
+                         filename = file.path(dPath, paste0(studyAreaName, '_histMDC.grd')),
                          overwrite = TRUE)
-  names(historicalMDC) <- paste0('year', P(sim)$historicalFireYears)
+  names(historicalMDC) <- paste0('year', 1991:2019) ## TODO: hardcode? data are specific to these years
   sim$historicalClimateRasters <- list('MDC' = historicalMDC)
 
   projectedClimateUrl <- if (grepl("RCP45", runName)) {
@@ -199,19 +217,18 @@ Init <- function(sim) {
                              # rasterToMatch = sim$rasterToMatch,
                              # studyArea = sim$studyArea,
                              fun = 'raster::stack',
-                             filename2 = paste0(P(sim)$studyAreaName, '_projClim.grd'),
+                             filename2 = paste0(studyAreaName, '_projClim.grd'),
                              useCache = TRUE,
                              userTags = c("histMDC", cacheTags))
-
   projectedMDC <- Cache(raster::projectRaster, projectedMDC, to = sim$rasterToMatch,
                         datatype = "INT2U",
-                        userTags = c("reprojProjectedMDC"))
-
+                        userTags = c("reprojProjectedMDC", cacheTags)) %>%
+    raster::stack(.)
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
                         userTags = c("maskProjectedClimateRasters"),
-                        filename = file.path(dPath, paste0(P(sim)$studyAreaName, '_projMDC.grd')),
+                        filename = file.path(dPath, paste0(studyAreaName, '_projMDC.grd')),
                         overwrite = TRUE)
-  names(projectedMDC) <- paste0("year", P(sim)$projectedFireYears)
+  names(projectedMDC) <- paste0("year", 2011:2100) ## TODO: hardcode? data are specific to these years
   sim$projectedClimateRasters <- list("MDC" = projectedMDC)
 
   ## SPECIES STUFF
