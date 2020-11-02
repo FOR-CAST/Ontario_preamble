@@ -1,6 +1,6 @@
 defineModule(sim, list(
   name = "Ontario_preamble",
-  description = "Study area definition and preparation of data required to run fireSense and LandR in the Ontairo AOU.",
+  description = "Study area definition and preparation of data required to run fireSense and LandR in the Ontario AOU/ROF.",
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca")
