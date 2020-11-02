@@ -11,7 +11,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list(),
+  reqdPkgs = list("raster", "reproducible", "sf", "sp"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -56,17 +56,17 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "Ontario_preamble", "save")
+      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
+      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "Ontario_preamble", "save", .last())
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
-
+      plot(as_Spatial(mod$ON))
+      plot(sim$studyArea, add = TRUE, col = "lightblue")
+      plot(sim$studyAreaLarge, add = TRUE)
 
       # schedule future event(s)
-
-      # e.g.,
       #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "Ontario_preamble", "plot")
 
       # ! ----- STOP EDITING ----- ! #
@@ -93,27 +93,31 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 
 Init <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
+  cacheTags <- c(P(sim)$runName, currentModule(sim))
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## provincial boundary
   canProvs <- Cache(prepInputs,
                     "GADM",
                     fun = "base::readRDS",
                     dlFun = "raster::getData",
-                    country = "CAN", level = 1, path = inputDir,
+                    country = "CAN", level = 1, path = dPath,
                     #sim$targetCRS = targetCRS, ## TODO: fails on Windows
                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
+                    overwrite = TRUE,
                     cacheRepo = cacheDir,
-                    destinationPath = inputDir) %>%
+                    destinationPath = dPath) %>%
     st_as_sf(.)
 
-  ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
+  mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
     st_transform(., crs = sim$targetCRS)
 
   ## STUDY AREA
   if (grepl("AOU", toupper(P(sim)$runName))) {
     studyArea <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
-      destinationPath = inputDir,
+      destinationPath = dPath,
       targetFile = "CEON_def.shp",
       alsoExtract = "similar",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
@@ -125,7 +129,7 @@ Init <- function(sim) {
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1ngQshBgoyLjkjuXnloXPg7IUMdLmppkB",
-      destinationPath = inputDir,
+      destinationPath = dPath,
       targetFile = "CEON_def_50km_buff.shp",
       alsoExtract = "similar",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
@@ -139,7 +143,8 @@ Init <- function(sim) {
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
-      fun = "sf::st_read", destinationPath = dPath, filename2 = "ROF_RA_def", overwrite = TRUE
+      fun = "sf::st_read", destinationPath = dPath,
+      filename2 = "ROF_RA_def", overwrite = TRUE
     ) %>%
       as_Spatial(.)
 
@@ -147,7 +152,8 @@ Init <- function(sim) {
       url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
       targetCRS = targetCRS, ## TODO: fails on Windows
       targetFile = "ROF_RA_def_50km_buff.shp", alsoExtract = "similar",
-      fun = "sf::st_read", destinationPath = dPath, filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
+      fun = "sf::st_read", destinationPath = dPath,
+      filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
     ) %>%
       as_Spatial(.)
   }
@@ -198,15 +204,15 @@ Init <- function(sim) {
                              userTags = c("histMDC", cacheTags))
 
   projectedMDC <- Cache(raster::projectRaster, projectedMDC, to = sim$rasterToMatch,
-                        datatype = 'INT2U',
+                        datatype = "INT2U",
                         userTags = c("reprojProjectedMDC"))
 
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
                         userTags = c("maskProjectedClimateRasters"),
                         filename = file.path(dPath, paste0(P(sim)$studyAreaName, '_projMDC.grd')),
                         overwrite = TRUE)
-  names(projectedMDC) <- paste0('year', P(sim)$projectedFireYears)
-  sim$projectedClimateRasters <- list('MDC' = projectedMDC)
+  names(projectedMDC) <- paste0("year", P(sim)$projectedFireYears)
+  sim$projectedClimateRasters <- list("MDC" = projectedMDC)
 
   ## SPECIES STUFF
   data("sppEquivalencies_CA", package = "LandR")
@@ -244,7 +250,7 @@ Init <- function(sim) {
 
   sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, palette = "Accent")
 
-  sim$speciesTable <- getSpeciesTable(dPath = paths1$inputPath) ## uses default URL
+  sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
@@ -257,7 +263,7 @@ Init <- function(sim) {
 
   # ! ----- EDIT BELOW ----- ! #
   if (!suppliedElsewhere(targetCRS)) {
-    targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
+    sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
                        "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
   }
 
