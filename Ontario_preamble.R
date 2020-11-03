@@ -63,12 +63,12 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
       ON <- as_Spatial(mod$ON)
+      Plot(ON, col = "Greens")
+      Plot(sim$studyArea, addTo = "ON", col = "Accent")
 
-      Plot(sim$studyArea)
-      Plot(ON, addTo = "sim$studyArea")
-
-      Plot(sim$studyAreaLarge)
-      Plot(ON, addTo = "sim$studyAreaLarge")
+      #ON2 <- ON
+      #Plot(ON2, col = "Greens")
+      #Plot(sim$studyAreaLarge, addTo = "ON2", col = "Accent")
 
       Plot(sim$rasterToMatch)
       #Plot(ON, addTo = "sim$rasterToMatch")
@@ -175,6 +175,9 @@ Init <- function(sim) {
       as_Spatial(.)
   }
 
+  sim$studyArea <- studyArea
+  sim$studyAreaLarge <- studyAreaLarge
+
   ## RASTERS TO MATCH
   sim$rasterToMatch <- LandR::prepInputsLCC(studyArea = sim$studyArea,
                                             destinationPath = dPath,
@@ -211,7 +214,6 @@ Init <- function(sim) {
   } else if (grepl("RCP85", runName)) {
     "https://drive.google.com/file/d/1haj15Jf7HhEWxRU52_mTp3VIcqfWYQ5K/"
   }
-
   projectedMDC <- prepInputs(url = projectedClimateUrl,
                              destinationPath = dPath,
                              # rasterToMatch = sim$rasterToMatch,
@@ -281,7 +283,7 @@ Init <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   if (!suppliedElsewhere(targetCRS)) {
     sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
-                       "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
+                           "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
   }
 
   # ! ----- STOP EDITING ----- ! #
