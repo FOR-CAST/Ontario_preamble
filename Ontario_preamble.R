@@ -73,15 +73,12 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       Plot(ON, col = "Greens")
       Plot(sim$studyArea, addTo = "ON", col = "Accent")
 
-      #ON2 <- ON
-      #Plot(ON2, col = "Greens")
-      #Plot(sim$studyAreaLarge, addTo = "ON2", col = "Accent")
-
       Plot(sim$rasterToMatch)
-      #Plot(ON, addTo = "sim$rasterToMatch")
-
       Plot(sim$rasterToMatchLarge)
-      #Plot(ON, addTo = "sim$rasterToMatchLarge")
+
+      Plot(sim$ageMap)
+
+      Plot(sim$LCC)
 
       # schedule future event(s)
       #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "Ontario_preamble", "plot")
@@ -283,6 +280,7 @@ Init <- function(sim) {
   sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, newVals = "Mixed", palette = "Accent")
 
   sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
+
   ## LANDCOVER AND AGE MAPS (kNN and ON FRI)
   LCC2005 <- prepInputsLCC(studyArea = sim$studyAreaLarge, destinationPath = dPath)
   if (P(sim)$.resolution == 125L) {
