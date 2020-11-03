@@ -246,7 +246,7 @@ Init <- function(sim) {
                                 Pice_mar = "Pice_mar",
                                 Pinu_ban = "Pinu_sp",
                                 Popu_bal = "Popu_sp", Popu_tre = "Popu_sp",
-                                Thuj_occ = "Thuj_sp", Thuj_sp = "Thuj_sp")[LandR]]
+                                Thuj_occ = "Thuj_occ")[LandR]]
 
   sppEquivalencies_CA[ON == "Abie_sp", EN_generic_full := "Fir"]
   sppEquivalencies_CA[ON == "Abie_sp", EN_generic_short := "Fir"]
@@ -260,10 +260,10 @@ Init <- function(sim) {
   sppEquivalencies_CA[ON == "Popu_sp", EN_generic_full := "Poplar"]
   sppEquivalencies_CA[ON == "Popu_sp", EN_generic_short := "Poplar"]
 
-  sppEquivalencies_CA[ON == "Thuj_sp", `:=`(EN_generic_full = "Cedar",
-                                            EN_generic_short = "Cedar",
-                                            LANDIS_traits = "THUJ.SPP.ALL",
-                                            Leading = "Cedar leading")]
+  sppEquivalencies_CA[ON == "Thuj_occ", `:=`(EN_generic_full = "Cedar",
+                                             EN_generic_short = "Cedar",
+                                             LANDIS_traits = "THUJ.SPP.ALL",
+                                             Leading = "Cedar leading")]
 
   sim$sppEquiv <- sppEquivalencies_CA[!is.na(ON), ]
 
