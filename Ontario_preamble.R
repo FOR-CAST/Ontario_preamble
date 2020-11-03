@@ -11,7 +11,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list("raster", "reproducible", "sf", "sp"),
+  reqdPkgs = list("httr", "raster", "reproducible", "sf", "sp"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -27,14 +27,21 @@ defineModule(sim, list(
                           "and time are not relevant")),
     defineParameter("runName", 'character', 'AOU', NA, NA,
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea,",
-                          "as well as 'RCP45' or 'RCP85' to identify the climate scenario to use."))
+                          "as well as 'RCP45' or 'RCP85' to identify the climate scenario to use.")),
+    defineParameter("treeClassesLCC", "numeric", c(1:15, 20, 32, 34:35), 0, 39,
+                    "The classes in the LCC2005 layer that are considered 'trees' from the perspective of LandR-Biomass"),
+    defineParameter("treeClassesToReplace", "numeric", c(34:35), 0, 39,
+                    "The transient classes in the LCC2005 layer that will become 'trees' from the perspective of LandR-Biomass (e.g., burned)")
   ),
   inputObjects = bindrows(
     expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
   ),
   outputObjects = bindrows(
+    createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
     createsOutput("climateDataHistoric", "list", desc = "list of RasterStacks of historical MDC calculated from ClimateNA data."),
     createsOutput("climateDataProjected", "list", desc = "list of RasterStacks of projected MDC calculated from ClimateNA data."),
+    createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
     createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on studyAreaLarge."),
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
@@ -187,6 +194,10 @@ Init <- function(sim) {
                                                  destinationPath = dPath,
                                                  useCache = P(sim)$.useCache,
                                                  filename2 = paste0(studyAreaName, '_rtml.tif'))
+  if (P(sim)$.resolution == 125L) {
+    sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
+    sim$rasterToMatchLarge <- Cache(raster::disaggregate, x = sim$rasterToMatchLarge, fact = 2)
+  }
 
   ## CLIMATE DATA (used by fireSense)
   historicalClimateUrl <- "https://drive.google.com/file/d/1ZsppgYeIYsrcScvetoLJNjuA0E5IwhkM"
@@ -196,8 +207,9 @@ Init <- function(sim) {
                               # studyArea = sim$studyArea,
                               fun = 'raster::stack',
                               filename2 = paste0(studyAreaName, '_histClim.grd'),
-                              useCache = TRUE,
-                              userTags = c("histMDC", cacheTags))
+                              useCache = P(sim)$.useCache,
+                              userTags = c("histMDC", cacheTags)) %>%
+    raster::stack(.)
   historicalMDC <- Cache(raster::projectRaster, historicalMDC, to = sim$rasterToMatch,
                          datatype = 'INT2U',
                          userTags = c("reprojHistoricClimateRasters", cacheTags)) %>%
@@ -214,14 +226,15 @@ Init <- function(sim) {
   } else if (grepl("RCP85", runName)) {
     "https://drive.google.com/file/d/1haj15Jf7HhEWxRU52_mTp3VIcqfWYQ5K/"
   }
-  projectedMDC <- prepInputs(url = projectedClimateUrl,
+  projectedMDC <- prepInputs(url = projectedClimateUrl, ## TODO: put all 3 steps into a single prepInputs call
                              destinationPath = dPath,
                              # rasterToMatch = sim$rasterToMatch,
                              # studyArea = sim$studyArea,
                              fun = 'raster::stack',
                              filename2 = paste0(studyAreaName, '_projClim.grd'),
-                             useCache = TRUE,
-                             userTags = c("histMDC", cacheTags))
+                             useCache = P(sim)$.useCache,
+                             userTags = c("histMDC", cacheTags)) %>%
+    raster::stack(.)
   projectedMDC <- Cache(raster::projectRaster, projectedMDC, to = sim$rasterToMatch,
                         datatype = "INT2U",
                         userTags = c("reprojProjectedMDC", cacheTags)) %>%
@@ -267,9 +280,121 @@ Init <- function(sim) {
 
   sim$sppEquiv <- sppEquivalencies_CA[!is.na(ON), ]
 
-  sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, palette = "Accent")
+  sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, newVals = "Mixed", palette = "Accent")
 
   sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
+  ## LANDCOVER AND AGE MAPS (kNN and ON FRI)
+  LCC2005 <- prepInputsLCC(studyArea = sim$studyAreaLarge, destinationPath = dPath)
+  if (P(sim)$.resolution == 125L) {
+    LCC2005 <- Cache(raster::disaggregate, x = LCC2005, fact = 2)
+  }
+
+  ## NOTE: there are 10 LCC classes for ON (see Benoit's README); we want class 10 - FOR)
+  if (studyAreaName == "AOU") {
+    LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
+                          destinationPath = dPath, filename2 = "lcc_fri_ceon_250m.tif",
+                          fun = "raster::raster", method = "ngb",
+                          rasterToMatch = sim$rasterToMatchLarge)
+  } else if (studyAreaName == "ROF") {
+    if (P(sim)$.resolution == 125L) {
+      LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1JouBj0iJOPB1qQeXkRRePMN6MZSX_R_q",
+                            destinationPath = dPath, filename2 = "lcc_fri_rof_125m.tif",
+                            fun = "raster::raster", method = "ngb",
+                            rasterToMatch = sim$rasterToMatchLarge)
+    } else if (P(sim)$.resolution == 250L) {
+      LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1-2XSrSp_WrZCnqUhHTaj0rQpzOcSLrfS",
+                            destinationPath = dPath, filename2 = "lcc_fri_rof_250m.tif",
+                            fun = "raster::raster", method = "ngb",
+                            rasterToMatch = sim$rasterToMatchLarge)
+    }
+  }
+  LCC_FRI <- setMinMax(LCC_FRI)
+
+  ###### FRI LANDCOVER CLASSES
+  ## 1 - water
+  ## 2 - developed agricultural land
+  ## 3 - grass and meadow
+  ## 4 - small island
+  ## 5 - unclassified
+  ## 6 - brush and alder
+  ## 7 - rock
+  ## 8 - treed wetland
+  ## 9 - open wetland
+  ## 10 - forested
+  nontreeClassesFRI <- 1:9
+  treeClassesFRI <- 10
+  treePixelsFRI_TF <- LCC_FRI[] %in% treeClassesFRI
+  LandTypeFRI_NA <- is.na(LCC_FRI[])
+  noDataPixelsFRI <- LandTypeFRI_NA
+  treePixelsCC <- which(treePixelsFRI_TF)
+
+  uniqueLCCclasses <- na.omit(unique(LCC2005[]))
+  nontreeClassesLCC <- sort(uniqueLCCclasses[!uniqueLCCclasses %in% P(sim)$treeClassesLCC])
+
+  ## for each LCC2005 + LCC_FRI class combo, define which LCC2005 code should be used
+  ## remember, setting a pixel to NA will omit it entirely (i.e., non-vegetated)
+  remapDT <- as.data.table(expand.grid(LCC2005 = c(NA_integer_, sort(uniqueLCCclasses)),
+                                       LCC_FRI = c(NA_integer_, 0:5)))
+  remapDT[LCC2005 == 0, newLCC := NA_integer_]
+  remapDT[is.na(LCC_FRI), newLCC := LCC2005]
+  remapDT[LCC_FRI %in% c(1, 5, 7), newLCC := NA_integer_]
+  remapDT[LCC_FRI %in% c(2, 3, 6, 8, 9, 10), newLCC := LCC2005]
+  remapDT[is.na(LCC2005) & LCC_FRI %in% 10, newLCC := 99] ## reclassification needed
+  remapDT[LCC2005 %in% P(sim)$treeClassesToReplace, newLCC := 99] ## reclassification needed
+
+  sim$LCC <- Cache(overlayLCCs,
+                   LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
+                   forestedList = list(LCC_FRI = 10, LCC2005 = P(sim)$treeClassesLCC),
+                   outputLayer = "LCC2005",
+                   remapTable = remapDT,
+                   classesToReplace = c(P(sim)$treeClassesToReplace, 99),
+                   availableERC_by_Sp = NULL)
+  treePixelsLCC <- which(sim$LCC[] %in% P(sim)$treeClassesLCC)
+  nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
+
+  sim$nonTreePixels <- nonTreePixels
+
+  standAgeMapURL <- paste0(
+    "http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+    "canada-forests-attributes_attributs-forests-canada/2001-attributes_attributs-2001/",
+    "NFI_MODIS250m_2001_kNN_Structure_Stand_Age_v1.tif"
+  )
+  standAgeMapFileName <- basename(standAgeMapURL)
+
+  httr::with_config(config = httr::config(ssl_verifypeer = 0L), { ## TODO: re-enable verify
+    standAgeMap <- Cache(prepInputs,
+                         targetFile = standAgeMapFileName,
+                         destinationPath = dPath,
+                         url = standAgeMapURL,
+                         fun = "raster::raster",
+                         studyArea = sim$studyAreaLarge,
+                         rasterToMatch = sim$rasterToMatchLarge,
+                         maskWithRTM = TRUE,
+                         method = "bilinear",
+                         datatype = "INT2U",
+                         filename2 = NULL, overwrite = TRUE,
+                         userTags = c("stable", currentModule(sim)))
+  })
+
+  ## TODO: overlay age from FRI -- waiting on age layer from Benoit
+  if (FALSE) {
+    standAgeMapFRI <- Cache(prepInputs,
+                            url = "",
+                            filename1 = NULL,
+                            filename2 = NULL,
+                            studyArea = sim$studyAreaLarge,
+                            rasterToMatch = sim$rasterToMatchLarge,
+                            maskWithRTM = TRUE,
+                            method = "bilinear",
+                            datatype = "INT2U",
+                            userTags = c(studyAreaName, currentModule(sim)))
+    standAgeMapFRI[standAgeMapFRI < 0] <- 0L
+
+    standAgeMap[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+    standAgeMap[sim$nonTreePixels] <- NA
+  }
+
+  sim$ageMap <- as.integer(standAgeMap)
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
