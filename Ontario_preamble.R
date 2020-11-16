@@ -11,7 +11,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list("httr", "raster", "reproducible", "sf", "sp"),
+  reqdPkgs = list("httr", "raster", "rgeos", "reproducible", "sf", "sp"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -177,6 +177,12 @@ Init <- function(sim) {
       filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
     ) %>%
       as_Spatial(.)
+  }
+
+  ## define test study area
+  if (grepl("test", runName)) {
+    studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e8, seed = NULL)
+    studyAreaLarge <- buffer(studyArea, 10000)
   }
 
   sim$studyArea <- studyArea
