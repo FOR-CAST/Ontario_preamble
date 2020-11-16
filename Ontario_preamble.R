@@ -249,14 +249,25 @@ Init <- function(sim) {
                                                EN_generic_full = "Pine",
                                                Leading = "Pine leading")]
 
-  sppEquivalencies_CA[, ON := c(Abie_bal = "Abie_sp", Abie_las = "Abie_sp", Abie_sp = "Abie_sp",
-                                Betu_pap = "Betu_sp",
+  ## 'ONFRI' used for Ontairo forest resource inventory layers
+  sppEquivalencies_CA[, ONFRI := c(Abie_bal = "Abie_bal",
+                                 Betu_pap = "Betu_pap",
+                                 Lari_lar = "Lari_lar",
+                                 Pice_gla = "Pice_gla",
+                                 Pice_mar = "Pice_mar",
+                                 Pinu_ban = "Pinu_ban", #Pinu_res = "Pinu_res", ## TODO: double check Red Pine
+                                 Popu_bal = "Popu_bal", Popu_tre = "Popu_tre",
+                                 Thuj_occ = "Thuj_spp")[LandR]]
+
+  ## 'ON' used for simulations (i.e., sppEquivCol)
+  sppEquivalencies_CA[, ON := c(Abie_bal = "Abie_bal",
+                                Betu_pap = "Betu_pap",
                                 Lari_lar = "Lari_lar",
                                 Pice_gla = "Pice_gla",
                                 Pice_mar = "Pice_mar",
-                                Pinu_ban = "Pinu_sp",
+                                Pinu_ban = "Pinu_ban", #Pinu_res = "Pinu_res", ## TODO: double check Red Pine
                                 Popu_bal = "Popu_sp", Popu_tre = "Popu_sp",
-                                Thuj_occ = "Thuj_occ")[LandR]]
+                                Thuj_occ = "Thuj_sp")[LandR]]
 
   sppEquivalencies_CA[ON == "Abie_sp", EN_generic_full := "Fir"]
   sppEquivalencies_CA[ON == "Abie_sp", EN_generic_short := "Fir"]
@@ -270,10 +281,10 @@ Init <- function(sim) {
   sppEquivalencies_CA[ON == "Popu_sp", EN_generic_full := "Poplar"]
   sppEquivalencies_CA[ON == "Popu_sp", EN_generic_short := "Poplar"]
 
-  sppEquivalencies_CA[ON == "Thuj_occ", `:=`(EN_generic_full = "Cedar",
-                                             EN_generic_short = "Cedar",
-                                             LANDIS_traits = "THUJ.SPP.ALL",
-                                             Leading = "Cedar leading")]
+  sppEquivalencies_CA[ON == "Thuj_sp", `:=`(EN_generic_full = "Cedar",
+                                            EN_generic_short = "Cedar",
+                                            LANDIS_traits = "THUJ.SPP.ALL",
+                                            Leading = "Cedar leading")]
 
   sim$sppEquiv <- sppEquivalencies_CA[!is.na(ON), ]
 
