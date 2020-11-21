@@ -181,8 +181,9 @@ Init <- function(sim) {
 
   ## define test study area
   if (grepl("test", runName)) {
-    studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e8, seed = NULL)
+    studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e10, seed = NULL)
     studyAreaLarge <- buffer(studyArea, 10000)
+    shapefile(simOutPreamble$studyArea, file.path(outputPath(sim), "studyArea_AOU_test.shp"), overwrite = TRUE)
   }
 
   sim$studyArea <- studyArea
