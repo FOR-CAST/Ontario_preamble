@@ -221,7 +221,8 @@ Init <- function(sim) {
   historicalMDC <- Cache(raster::mask, historicalMDC, sim$studyArea,
                          userTags = c("maskHistoricClimateRasters"),
                          filename = file.path(dPath, paste0(studyAreaName, '_histMDC.grd')),
-                         overwrite = TRUE)
+                         overwrite = TRUE) %>%
+    raster::stack(.)
   names(historicalMDC) <- paste0('year', 1991:2019) ## TODO: hardcode? data are specific to these years
   sim$historicalClimateRasters <- list('MDC' = historicalMDC)
 
@@ -246,7 +247,8 @@ Init <- function(sim) {
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
                         userTags = c("maskProjectedClimateRasters"),
                         filename = file.path(dPath, paste0(studyAreaName, '_projMDC.grd')),
-                        overwrite = TRUE)
+                        overwrite = TRUE) %>%
+    raster::stack(.)
   names(projectedMDC) <- paste0("year", 2011:2100) ## TODO: hardcode? data are specific to these years
   sim$projectedClimateRasters <- list("MDC" = projectedMDC)
 
@@ -258,13 +260,13 @@ Init <- function(sim) {
 
   ## 'ONFRI' used for Ontairo forest resource inventory layers
   sppEquivalencies_CA[, ONFRI := c(Abie_bal = "Abie_bal",
-                                 Betu_pap = "Betu_pap",
-                                 Lari_lar = "Lari_lar",
-                                 Pice_gla = "Pice_gla",
-                                 Pice_mar = "Pice_mar",
-                                 Pinu_ban = "Pinu_ban", #Pinu_res = "Pinu_res", ## TODO: double check Red Pine
-                                 Popu_bal = "Popu_bal", Popu_tre = "Popu_tre",
-                                 Thuj_occ = "Thuj_spp")[LandR]]
+                                   Betu_pap = "Betu_pap",
+                                   Lari_lar = "Lari_lar",
+                                   Pice_gla = "Pice_gla",
+                                   Pice_mar = "Pice_mar",
+                                   Pinu_ban = "Pinu_ban", #Pinu_res = "Pinu_res", ## TODO: double check Red Pine
+                                   Popu_bal = "Popu_bal", Popu_tre = "Popu_tre",
+                                   Thuj_occ = "Thuj_spp")[LandR]]
 
   ## 'ON' used for simulations (i.e., sppEquivCol)
   sppEquivalencies_CA[, ON := c(Abie_bal = "Abie_bal",
