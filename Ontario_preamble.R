@@ -125,7 +125,7 @@ Init <- function(sim) {
                     fun = "base::readRDS",
                     dlFun = "raster::getData",
                     country = "CAN", level = 1, path = dPath,
-                    #sim$targetCRS = targetCRS, ## TODO: fails on Windows
+                    #targetCRS = sim$targetCRS, ## TODO: fails on Windows
                     targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
                     overwrite = TRUE,
                     destinationPath = dPath) %>%
@@ -171,7 +171,7 @@ Init <- function(sim) {
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
-      targetCRS = targetCRS, ## TODO: fails on Windows
+      targetCRS = sim$targetCRS, ## TODO: fails on Windows
       targetFile = "ROF_RA_def_50km_buff.shp", alsoExtract = "similar",
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
@@ -183,7 +183,7 @@ Init <- function(sim) {
   if (grepl("test", runName)) {
     studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e10, seed = NULL)
     studyAreaLarge <- buffer(studyArea, 10000)
-    shapefile(simOutPreamble$studyArea, file.path(outputPath(sim), "studyArea_AOU_test.shp"), overwrite = TRUE)
+    shapefile(sim$studyArea, file.path(outputPath(sim), "studyArea_AOU_test.shp"), overwrite = TRUE)
   }
 
   sim$studyArea <- studyArea
