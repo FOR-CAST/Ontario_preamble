@@ -47,6 +47,8 @@ defineModule(sim, list(
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
+    createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
+    createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
     createsOutput("studyAreaLarge", "SpatialPolygons", desc = "Buffered study area in which to run simulations.")
   )
@@ -76,7 +78,8 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       Plot(sim$rasterToMatch)
       Plot(sim$rasterToMatchLarge)
 
-      Plot(sim$ageMap)
+      Plot(sim$ageMap2001)
+      Plot(sim$ageMap2011)
 
       Plot(sim$LCC)
 
@@ -379,20 +382,30 @@ Init <- function(sim) {
   )
   standAgeMapFileName <- basename(standAgeMapURL)
 
-  httr::with_config(config = httr::config(ssl_verifypeer = 0L), { ## TODO: re-enable verify
-    standAgeMap <- Cache(prepInputs,
-                         targetFile = standAgeMapFileName,
-                         destinationPath = dPath,
-                         url = standAgeMapURL,
-                         fun = "raster::raster",
-                         studyArea = sim$studyAreaLarge,
-                         rasterToMatch = sim$rasterToMatchLarge,
-                         maskWithRTM = TRUE,
-                         method = "bilinear",
-                         datatype = "INT2U",
-                         filename2 = NULL, overwrite = TRUE,
-                         userTags = c("stable", currentModule(sim)))
-  })
+  standAgeMap2001 <- Cache(
+    LandR::prepInputsStandAgeMap,
+    ageUrl = standAgeMapURL,
+    rasterToMatch = sim$rasterToMatchLarge,
+    studyArea = sim$studyAreaLarge,
+    destinationPath = dPath,
+    startTime = 2001,
+    filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
+    userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+  )
+
+  standAgeMap2011 <- Cache(
+    LandR::prepInputsStandAgeMap,
+    ageURL = paste0("https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                    "canada-forests-attributes_attributs-forests-canada/",
+                    "2011-attributes_attributs-2011/",
+                    "NFI_MODIS250m_2011_kNN_Structure_Stand_Age_v1.tif"),
+    rasterToMatch = sim$rasterToMatchLarge,
+    studyArea = sim$studyAreaLarge,
+    destinationPath = dPath,
+    startTime = 2011,
+    filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
+    userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+  )
 
   ## TODO: overlay age from FRI -- waiting on age layer from Benoit
   if (FALSE) {
@@ -408,11 +421,17 @@ Init <- function(sim) {
                             userTags = c(studyAreaName, currentModule(sim)))
     standAgeMapFRI[standAgeMapFRI < 0] <- 0L
 
-    standAgeMap[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-    standAgeMap[sim$nonTreePixels] <- NA
+    ## 2001 age map
+    standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+    standAgeMap2001[sim$nonTreePixels] <- NA
+
+    ## 2011 age map
+    standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+    standAgeMap2011[sim$nonTreePixels] <- NA
   }
 
-  sim$ageMap <- as.integer(standAgeMap)
+  sim$ageMap2001 <- as.integer(standAgeMap2001)
+  sim$ageMap2011 <- as.integer(standAgeMap2011)
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
