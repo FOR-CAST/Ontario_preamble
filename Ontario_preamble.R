@@ -139,7 +139,7 @@ Init <- function(sim) {
 
   ## STUDY AREA
   if (grepl("AOU", toupper(P(sim)$runName))) {
-    studyArea <- prepInputs(
+    studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
       destinationPath = dPath,
       targetFile = "CEON_def.shp",
@@ -150,6 +150,8 @@ Init <- function(sim) {
       team_drive = TRUE
     ) %>%
       as_Spatial(.)
+
+    studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1ngQshBgoyLjkjuXnloXPg7IUMdLmppkB",
@@ -163,7 +165,7 @@ Init <- function(sim) {
     ) %>%
       as_Spatial(.)
   } else if (grepl("ROF", toupper(P(sim)$runName))) {
-    studyArea <- prepInputs(
+    studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
@@ -171,6 +173,8 @@ Init <- function(sim) {
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) %>%
       as_Spatial(.)
+
+    studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
@@ -191,6 +195,7 @@ Init <- function(sim) {
 
   sim$studyArea <- studyArea
   sim$studyAreaLarge <- studyAreaLarge
+  sim$studyAreaReporting <- studyAreaReporting
 
   ## RASTERS TO MATCH
   sim$rasterToMatch <- LandR::prepInputsLCC(studyArea = sim$studyArea,
@@ -212,22 +217,22 @@ Init <- function(sim) {
                               destinationPath = dPath,
                               # rasterToMatch = sim$rasterToMatch,
                               # studyArea = sim$studyArea,
-                              fun = 'raster::stack',
-                              filename2 = paste0(studyAreaName, '_histClim.grd'),
+                              fun = "raster::stack",
+                              filename2 = paste0(studyAreaName, "_histClim.grd"),
                               useCache = P(sim)$.useCache,
                               userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
   historicalMDC <- Cache(raster::projectRaster, historicalMDC, to = sim$rasterToMatch,
-                         datatype = 'INT2U',
+                         datatype = "INT2U",
                          userTags = c("reprojHistoricClimateRasters", cacheTags)) %>%
     raster::stack(.)
   historicalMDC <- Cache(raster::mask, historicalMDC, sim$studyArea,
                          userTags = c("maskHistoricClimateRasters"),
-                         filename = file.path(dPath, paste0(studyAreaName, '_histMDC.grd')),
+                         filename = file.path(dPath, paste0(studyAreaName, "_histMDC.grd")),
                          overwrite = TRUE) %>%
     raster::stack(.)
-  names(historicalMDC) <- paste0('year', 1991:2019) ## TODO: hardcode? data are specific to these years
-  sim$historicalClimateRasters <- list('MDC' = historicalMDC)
+  names(historicalMDC) <- paste0("year", 1991:2019) ## TODO: hardcode? data are specific to these years
+  sim$historicalClimateRasters <- list("MDC" = historicalMDC)
 
   projectedClimateUrl <- if (grepl("RCP45", runName)) {
     "https://drive.google.com/file/d/1xgTS-BHd3Rna5C2svqBdneQMEWjD5q5Z/"
@@ -238,8 +243,8 @@ Init <- function(sim) {
                              destinationPath = dPath,
                              # rasterToMatch = sim$rasterToMatch,
                              # studyArea = sim$studyArea,
-                             fun = 'raster::stack',
-                             filename2 = paste0(studyAreaName, '_projClim.grd'),
+                             fun = "raster::stack",
+                             filename2 = paste0(studyAreaName, "_projClim.grd"),
                              useCache = P(sim)$.useCache,
                              userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
@@ -249,7 +254,7 @@ Init <- function(sim) {
     raster::stack(.)
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
                         userTags = c("maskProjectedClimateRasters"),
-                        filename = file.path(dPath, paste0(studyAreaName, '_projMDC.grd')),
+                        filename = file.path(dPath, paste0(studyAreaName, "_projMDC.grd")),
                         overwrite = TRUE) %>%
     raster::stack(.)
   names(projectedMDC) <- paste0("year", 2011:2100) ## TODO: hardcode? data are specific to these years
