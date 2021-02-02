@@ -44,13 +44,15 @@ defineModule(sim, list(
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
     createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on studyAreaLarge."),
+    createsOutput("rasterToMatchReporting", "RasterLayer", desc = "Raster to match based on studyAreaReporting."),
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
     createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
     createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
-    createsOutput("studyAreaLarge", "SpatialPolygons", desc = "Buffered study area in which to run simulations.")
+    createsOutput("studyAreaLarge", "SpatialPolygons", desc = "Buffered study area used for parameterization/calibration."),
+    createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing.")
   )
 ))
 
@@ -206,6 +208,11 @@ Init <- function(sim) {
                                                  destinationPath = dPath,
                                                  useCache = P(sim)$.useCache,
                                                  filename2 = paste0(studyAreaName, '_rtml.tif'))
+  sim$rasterToMatchReporting <- LandR::prepInputsLCC(studyArea = sim$studyAreaReporting,
+                                                     destinationPath = dPath,
+                                                     useCache = P(sim)$.useCache,
+                                                     filename2 = paste0(studyAreaName, '_rtmr.tif'))
+
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
     sim$rasterToMatchLarge <- Cache(raster::disaggregate, x = sim$rasterToMatchLarge, fact = 2)
@@ -257,7 +264,7 @@ Init <- function(sim) {
                         filename = file.path(dPath, paste0(studyAreaName, "_projMDC.grd")),
                         overwrite = TRUE) %>%
     raster::stack(.)
-  names(projectedMDC) <- paste0("year", 2011:2100) ## TODO: hardcode? data are specific to these years
+  projectedMDC <- updateStackYearNames(projectedMDC, Par$projectedFireYears)
   sim$projectedClimateRasters <- list("MDC" = projectedMDC)
 
   ## SPECIES STUFF
