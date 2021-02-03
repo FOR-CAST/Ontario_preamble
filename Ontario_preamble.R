@@ -125,16 +125,16 @@ Init <- function(sim) {
   }
 
   ## provincial boundary
-  canProvs <- Cache(prepInputs,
-                    "GADM",
-                    fun = "base::readRDS",
-                    dlFun = "raster::getData",
-                    country = "CAN", level = 1, path = dPath,
-                    #targetCRS = sim$targetCRS, ## TODO: fails on Windows
-                    targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
-                    overwrite = TRUE,
-                    destinationPath = dPath) %>%
-    st_as_sf(.)
+  # canProvs <- Cache(prepInputs,
+  #                   "GADM",
+  #                   fun = "base::readRDS",
+  #                   dlFun = "raster::getData",
+  #                   country = "CAN", level = 1, path = dPath,
+  #                   #targetCRS = sim$targetCRS, ## TODO: fails on Windows
+  #                   targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
+  #                   overwrite = TRUE,
+  #                   destinationPath = dPath) %>% ## TODO: why is this failing?
+  canProvs <- getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
 
   mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
     st_transform(., crs = sim$targetCRS)
@@ -219,7 +219,7 @@ Init <- function(sim) {
   }
 
   ## CLIMATE DATA (used by fireSense)
-  historicalClimateUrl <- "https://drive.google.com/file/d/1ZsppgYeIYsrcScvetoLJNjuA0E5IwhkM"
+  historicalClimateUrl <- "https://drive.google.com/file/d/1CHSaBUwi_DAdygRQ032yOQWt1yKeSw0s"
   historicalMDC <- prepInputs(url = historicalClimateUrl, ## TODO: put all 3 steps into a single prepInputs call
                               destinationPath = dPath,
                               # rasterToMatch = sim$rasterToMatch,
@@ -238,7 +238,7 @@ Init <- function(sim) {
                          filename = file.path(dPath, paste0(studyAreaName, "_histMDC.grd")),
                          overwrite = TRUE) %>%
     raster::stack(.)
-  names(historicalMDC) <- paste0("year", 1991:2019) ## TODO: hardcode? data are specific to these years
+  historicalMDC <- updateStackYearNames(historicalMDC, Par$historicalFireYears)
   sim$historicalClimateRasters <- list("MDC" = historicalMDC)
 
   projectedClimateUrl <- if (grepl("RCP45", runName)) {
