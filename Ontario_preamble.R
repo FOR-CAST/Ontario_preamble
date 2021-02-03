@@ -25,6 +25,10 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
+    defineParameter("historicalFireYears", "numeric", default = 1991:2019, NA, NA,
+                    "range of years captured by the historical climate data"),
+    defineParameter("projectedFireYears", "numeric", default = 2011:2100, NA, NA,
+                    "range of years captured by the projected climate data"),
     defineParameter("runName", "character", "AOU", NA, NA,
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea,",
                           "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use.")),
@@ -238,6 +242,7 @@ Init <- function(sim) {
                          filename = file.path(dPath, paste0(studyAreaName, "_histMDC.grd")),
                          overwrite = TRUE) %>%
     raster::stack(.)
+
   historicalMDC <- updateStackYearNames(historicalMDC, Par$historicalFireYears)
   sim$historicalClimateRasters <- list("MDC" = historicalMDC)
 
