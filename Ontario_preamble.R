@@ -229,7 +229,7 @@ Init <- function(sim) {
                               # rasterToMatch = sim$rasterToMatch,
                               # studyArea = sim$studyArea,
                               fun = "raster::stack",
-                              filename2 = paste0(studyAreaName, "_histClim.grd"),
+                              filename2 = paste0(studyAreaName, "_histMDC.grd"), ##TODO: verify these
                               useCache = P(sim)$.useCache,
                               userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
@@ -256,12 +256,13 @@ Init <- function(sim) {
                              # rasterToMatch = sim$rasterToMatch,
                              # studyArea = sim$studyArea,
                              fun = "raster::stack",
-                             filename2 = paste0(studyAreaName, "_projClim.grd"),
+                             filename2 = paste0(studyAreaName, "_projMDC.grd"),
                              useCache = P(sim)$.useCache,
                              userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
   projectedMDC <- Cache(raster::projectRaster, projectedMDC, to = sim$rasterToMatch,
                         datatype = "INT2U",
+                        filename = file.path(dPath, paste0(studyAreaName, "_projMDC.grd")),
                         userTags = c("reprojProjectedMDC", cacheTags)) %>%
     raster::stack(.)
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
@@ -372,7 +373,7 @@ Init <- function(sim) {
   ## for each LCC2005 + LCC_FRI class combo, define which LCC2005 code should be used
   ## remember, setting a pixel to NA will omit it entirely (i.e., non-vegetated)
   remapDT <- as.data.table(expand.grid(LCC2005 = c(NA_integer_, sort(uniqueLCCclasses)),
-                                       LCC_FRI = c(NA_integer_, 0:5)))
+                                       LCC_FRI = c(NA_integer_, 1:10)))
   remapDT[LCC2005 == 0, newLCC := NA_integer_]
   remapDT[is.na(LCC_FRI), newLCC := LCC2005]
   remapDT[LCC_FRI %in% c(1, 5, 7), newLCC := NA_integer_]
