@@ -257,12 +257,14 @@ Init <- function(sim) {
                              # studyArea = sim$studyArea,
                              fun = "raster::stack",
                              filename2 = paste0(studyAreaName, "_projMDC.grd"),
+                             overwrite = TRUE,
                              useCache = P(sim)$.useCache,
                              userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
   projectedMDC <- Cache(raster::projectRaster, projectedMDC, to = sim$rasterToMatch,
                         datatype = "INT2U",
                         filename = file.path(dPath, paste0(studyAreaName, "_projMDC.grd")),
+                        overwrite = TRUE,
                         userTags = c("reprojProjectedMDC", cacheTags)) %>%
     raster::stack(.)
   projectedMDC <- Cache(raster::mask, projectedMDC, sim$studyArea,
