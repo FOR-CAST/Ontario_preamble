@@ -230,11 +230,14 @@ Init <- function(sim) {
                               # studyArea = sim$studyArea,
                               fun = "raster::stack",
                               filename2 = paste0(studyAreaName, "_histMDC.grd"), ##TODO: verify these
+                              overwrite = TRUE,
                               useCache = P(sim)$.useCache,
                               userTags = c("histMDC", cacheTags)) %>%
     raster::stack(.)
   historicalMDC <- Cache(raster::projectRaster, historicalMDC, to = sim$rasterToMatch,
                          datatype = "INT2U",
+                         filename2 = paste0(studyAreaName, "_histMDC.grd"),
+                         overwrite = TRUE,
                          userTags = c("reprojHistoricClimateRasters", cacheTags)) %>%
     raster::stack(.)
   historicalMDC <- Cache(raster::mask, historicalMDC, sim$studyArea,
