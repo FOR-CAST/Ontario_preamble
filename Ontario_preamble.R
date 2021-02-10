@@ -42,8 +42,8 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
-    createsOutput("climateDataHistoric", "list", desc = "list of RasterStacks of historical MDC calculated from ClimateNA data."),
-    createsOutput("climateDataProjected", "list", desc = "list of RasterStacks of projected MDC calculated from ClimateNA data."),
+    createsOutput("historicalClimateRasters", "list", desc = "list of RasterStacks of historical MDC calculated from ClimateNA data."),
+    createsOutput("projectedClimateRasters", "list", desc = "list of RasterStacks of projected MDC calculated from ClimateNA data."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
