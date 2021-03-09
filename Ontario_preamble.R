@@ -427,32 +427,52 @@ Init <- function(sim) {
     filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
   )
-
-  ## TODO: overlay age from FRI -- waiting on age layer from Benoit
-  if (FALSE) {
-    standAgeMapFRI <- Cache(prepInputs,
-                            url = "",
-                            filename1 = NULL,
-                            filename2 = NULL,
-                            studyArea = sim$studyAreaLarge,
-                            rasterToMatch = sim$rasterToMatchLarge,
-                            maskWithRTM = TRUE,
-                            method = "bilinear",
-                            datatype = "INT2U",
-                            userTags = c(studyAreaName, currentModule(sim)))
-    standAgeMapFRI[standAgeMapFRI < 0] <- 0L
-
-    ## 2001 age map
-    standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-    standAgeMap2001[sim$nonTreePixels] <- NA
-
-    ## 2011 age map
-    standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-    standAgeMap2011[sim$nonTreePixels] <- NA
+#browser()
+if (FALSE) {
+  ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
+  if (studyAreaName == "AOU") {
+    standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
+                                 destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
+                                 fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                 rasterToMatch = sim$rasterToMatchLarge,
+                                 userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+    refYearMapFRI <- prepInputs(url = "",
+                                destinationPath = dPath, filename2 = "",
+                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                rasterToMatch = sim$rasterToMatchLarge,
+                                userTags = c("refYearMapFRI", studyAreaName, currentModule(sim)))
+  } else if (studyAreaName == "ROF") {
+    if (P(sim)$.resolution == 125L) {
+      standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
+                                   destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
+                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                   rasterToMatch = sim$rasterToMatchLarge,
+                                   userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+    } else if (P(sim)$.resolution == 250L) {
+      standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
+                                   destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
+                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                   rasterToMatch = sim$rasterToMatchLarge,
+                                   userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+    }
   }
+  standAgeMapFRI <- setMinMax(standAgeMapFRI)
+  standAgeMapFRI[standAgeMapFRI < 0] <- 0L
 
-  sim$ageMap2001 <- as.integer(standAgeMap2001)
-  sim$ageMap2011 <- as.integer(standAgeMap2011)
+  # TODO:
+  #   1. adjust each age by reference year, for 2001 and 2011 to get age in 2001 and 2011
+  #   2. any values < 0, set as NA. we will fall back to kNN values for these
+
+  ## 2001 age map
+  standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+  standAgeMap2001[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+
+  ## 2011 age map
+  standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+  standAgeMap2011[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+}
+  sim$standAgeMap2001 <- as.integer(standAgeMap2001)
+  sim$standAgeMap2011 <- as.integer(standAgeMap2011)
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
