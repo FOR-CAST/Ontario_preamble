@@ -284,7 +284,7 @@ Init <- function(sim) {
                                                EN_generic_full = "Pine",
                                                Leading = "Pine leading")]
 
-  ## 'ONFRI' used for Ontairo forest resource inventory layers
+  ## 'ONFRI' used for Ontario forest resource inventory layers
   sppEquivalencies_CA[, ONFRI := c(Abie_bal = "Abie_bal",
                                    Betu_pap = "Betu_pap",
                                    Lari_lar = "Lari_lar",
