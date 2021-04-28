@@ -27,6 +27,8 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
+    defineParameter("climateScenario", "character", default = "CCSM4_RCP85", NA, NA,
+                    "short description of GCM and RCP, e.g., 'CCSM4_RCP85'"),
     defineParameter("historicalFireYears", "numeric", default = 1991:2019, NA, NA,
                     "range of years captured by the historical climate data"),
     defineParameter("projectedFireYears", "numeric", default = 2011:2100, NA, NA,
@@ -249,10 +251,12 @@ Init <- function(sim) {
   historicalMDC <- updateStackYearNames(historicalMDC, Par$historicalFireYears)
   sim$historicalClimateRasters <- list("MDC" = historicalMDC)
 
-  projectedClimateUrl <- if (grepl("RCP45", runName)) {
+  projectedClimateUrl <- if (P(sim)$climateScenario == "CCSM4_RCP45") {
     "https://drive.google.com/file/d/1xgTS-BHd3Rna5C2svqBdneQMEWjD5q5Z/"
-  } else if (grepl("RCP85", runName)) {
+  } else if (P(sim)$climateScenario == "CCSM4_RCP85") {
     "https://drive.google.com/file/d/1haj15Jf7HhEWxRU52_mTp3VIcqfWYQ5K/"
+  } else {
+    stop("no url specified for selected climate scenario: ", P(sim)$climateScenario)
   }
 
   projectedMDC <- prepInputs(url = projectedClimateUrl, ## TODO: put all 3 steps into a single prepInputs call
