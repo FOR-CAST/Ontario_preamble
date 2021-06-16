@@ -208,18 +208,24 @@ Init <- function(sim) {
   sim$studyAreaReporting <- studyAreaReporting
 
   ## RASTERS TO MATCH
-  sim$rasterToMatch <- LandR::prepInputsLCC(studyArea = sim$studyArea,
-                                            destinationPath = dPath,
-                                            useCache = P(sim)$.useCache,
-                                            filename2 = paste0(studyAreaName, '_rtm.tif'))
-  sim$rasterToMatchLarge <- LandR::prepInputsLCC(studyArea = sim$studyAreaLarge,
-                                                 destinationPath = dPath,
-                                                 useCache = P(sim)$.useCache,
-                                                 filename2 = paste0(studyAreaName, '_rtml.tif'))
-  sim$rasterToMatchReporting <- LandR::prepInputsLCC(studyArea = sim$studyAreaReporting,
-                                                     destinationPath = dPath,
-                                                     useCache = P(sim)$.useCache,
-                                                     filename2 = paste0(studyAreaName, '_rtmr.tif'))
+  sim$rasterToMatch <- Cache(LandR::prepInputsLCC,
+                             year = 2005, ## TODO: use 2010
+                             studyArea = sim$studyArea,
+                             destinationPath = dPath,
+                             useCache = P(sim)$.useCache,
+                             filename2 = paste0(studyAreaName, '_rtm.tif'))
+  sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
+                                  year = 2005, ## TODO: use 2010
+                                  studyArea = sim$studyAreaLarge,
+                                  destinationPath = dPath,
+                                  useCache = P(sim)$.useCache,
+                                  filename2 = paste0(studyAreaName, '_rtml.tif'))
+  sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
+                                      year = 2005, ## TODO: use 2010
+                                      studyArea = sim$studyAreaReporting,
+                                      destinationPath = dPath,
+                                      useCache = P(sim)$.useCache,
+                                      filename2 = paste0(studyAreaName, '_rtmr.tif'))
 
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
@@ -332,7 +338,7 @@ Init <- function(sim) {
   sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
 
   ## LANDCOVER AND AGE MAPS (kNN and ON FRI)
-  LCC2005 <- prepInputsLCC(studyArea = sim$studyAreaLarge, destinationPath = dPath)
+  LCC2005 <- prepInputsLCC(year = 2005, studyArea = sim$studyAreaLarge, destinationPath = dPath) ## TODO: use LCC2010
   if (P(sim)$.resolution == 125L) {
     LCC2005 <- Cache(raster::disaggregate, x = LCC2005, fact = 2)
   }
