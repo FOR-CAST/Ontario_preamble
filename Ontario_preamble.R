@@ -345,6 +345,34 @@ Init <- function(sim) {
     LCC2005 <- Cache(raster::disaggregate, x = LCC2005, fact = 2)
   }
 
+  ## FAR NORTH LANDCOVER (620 MB)
+  ## TODO: use prepInputs(), which currently cannot handle the convoluted archive layout
+  res <- downloadFile(
+    url = "https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip",
+    destinationPath = dPath,
+    archive = "Version 1.4/TIF Format/ab1da0f2-7bba-430b-af11-d503865ff130-TIF.zip",
+    neededFiles = c("New Folder/Class/FarNorth_LandCover_Class_UTM15.tif",
+                    "New Folder/Class/FarNorth_LandCover_Class_UTM16.tif",
+                    "New Folder/Class/FarNorth_LandCover_Class_UTM17.tif")
+  )
+
+  e15 <- extent(r15)
+  e16 <- extent(r16)
+  e17 <- extent(r17)
+  u <- union(e15, e16) %>% union(., e17)
+  template <- raster(u, res = P(sim)$.resolution,  crs = targetCRS)
+
+  f <- file.path(dPath, paste0("FarNorth_LandCover_Class_UTM", 15:17, ".tif"))
+  t15 <- raster(f[1]) %>% projectRaster(., template, alignOnly = TRUE)
+  t16 <- raster(f[2]) %>% projectRaster(., template, alignOnly = TRUE)
+  t17 <- raster(f[3]) %>% projectRaster(., template, alignOnly = TRUE)
+
+  r15 <- raster(f[1]) %>% projectRaster(., t15)
+  r16 <- raster(f[2]) %>% projectRaster(., t16)
+  r17 <- raster(f[3]) %>% projectRaster(., t17)
+
+  LCC_FN <- mosaic(r15, r16, r17)
+
   ## NOTE: there are 10 LCC classes for ON (see Benoit's README); we want class 10 - FOR)
   if (studyAreaName == "AOU") {
     LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
