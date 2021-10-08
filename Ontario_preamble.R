@@ -27,10 +27,14 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
-    defineParameter("climateScenario", "character", default = "CCSM4_RCP85", NA, NA,
-                    "short description of GCM and RCP, e.g., 'CCSM4_RCP85'"),
-    defineParameter("historicalFireYears", "numeric", default = 1991:2019, NA, NA,
-                    "range of years captured by the historical climate data"),
+    defineParameter("climateGCM", "numeric", "CNRM-ESM2-1", NA, NA,
+                    paste("Global Circulation Model to use for climate projections:",
+                          "currently '13GCMs_ensemble', 'CanESM5', 'CNRM-ESM2-1', or 'CCSM4'.")),
+    defineParameter("climateSSP", "numeric", 370, NA, NA,
+                    "SSP emissions scenario for `climateGCM`: one of 245, 370, or 585.",
+                    "[If using 'climateGCM = CCSM4', climateSSP must be one of 45 or 85.]"),
+    defineParameter("historicalFireYears", "numeric", default = 1991:2020, NA, NA,
+                    desc = "range of years captured by the historical climate data"),
     defineParameter("projectedFireYears", "numeric", default = 2011:2100, NA, NA,
                     "range of years captured by the projected climate data"),
     defineParameter("runName", "character", "AOU", NA, NA,
@@ -257,13 +261,11 @@ Init <- function(sim) {
   historicalMDC <- updateStackYearNames(historicalMDC, Par$historicalFireYears)
   sim$historicalClimateRasters <- list("MDC" = historicalMDC)
 
-  projectedClimateUrl <- if (P(sim)$climateScenario == "CCSM4_RCP45") {
-    "https://drive.google.com/file/d/1xgTS-BHd3Rna5C2svqBdneQMEWjD5q5Z/"
-  } else if (P(sim)$climateScenario == "CCSM4_RCP85") {
-    "https://drive.google.com/file/d/1haj15Jf7HhEWxRU52_mTp3VIcqfWYQ5K/"
-  } else {
-    stop("no url specified for selected climate scenario: ", P(sim)$climateScenario)
-  }
+  ## lookup table to get projectedClimateURL based on studyArea, GCM, and SSP
+  dt <- data.table::fread(file = file.path(dataPath(sim), "climateDataURLs.csv"))
+  projectedClimateUrl <- dt[studyArea == "ON" &
+                              GCM == P(sim)$climateGCM &
+                              SSP == P(sim)$climateSSP, GID]
 
   projectedMDC <- prepInputs(url = projectedClimateUrl, ## TODO: put all 3 steps into a single prepInputs call
                              destinationPath = dPath,
