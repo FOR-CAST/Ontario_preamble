@@ -538,6 +538,7 @@ Init <- function(sim) {
     studyArea = sim$studyAreaLarge,
     destinationPath = dPath,
     startTime = 2001,
+    fireURL = fireURL,
     filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
   )
@@ -552,6 +553,7 @@ Init <- function(sim) {
     studyArea = sim$studyAreaLarge,
     destinationPath = dPath,
     startTime = 2011,
+    fireURL = fireURL,
     filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
     userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
   )
