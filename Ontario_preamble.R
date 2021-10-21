@@ -472,7 +472,7 @@ Init <- function(sim) {
     u <- raster::union(e15, e16) %>% raster::union(., e17)
     template <- raster(u, res = P(sim)$.resolution,  crs = crs(sim$rasterToMatch))
 
-    f <- file.path(dPath, paste0("FarNorth_LandCover_Class_UTM", 15:17, ".tif"))
+    f <- file.path(dPath, "FarNorthLandCover", paste0("FarNorth_LandCover_Class_UTM", 15:17, ".tif"))
     t15 <- raster(f[1]) %>% projectRaster(., template, alignOnly = TRUE)
     t16 <- raster(f[2]) %>% projectRaster(., template, alignOnly = TRUE)
     t17 <- raster(f[3]) %>% projectRaster(., template, alignOnly = TRUE)
