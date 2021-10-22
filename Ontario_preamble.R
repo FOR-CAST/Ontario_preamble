@@ -493,7 +493,7 @@ Init <- function(sim) {
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
-    sim$LCC <- LCC_FN
+    sim$LCC <- asInteger(LCC_FN)
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
