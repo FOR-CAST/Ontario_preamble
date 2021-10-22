@@ -52,6 +52,7 @@ defineModule(sim, list(
     createsOutput("CMInormal", "RasterLayer", "Climate Moisture Index Normals from 1950-2010"),
     createsOutput("historicalClimateRasters", "list", desc = "list of RasterStacks of historical MDC calculated from ClimateNA data."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."),
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
     createsOutput("projectedClimateRasters", "list", desc = "list of RasterStacks of projected MDC calculated from ClimateNA data."),
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
@@ -424,11 +425,9 @@ Init <- function(sim) {
                      classesToReplace = c(treeClassesToReplace, 99),
                      availableERC_by_Sp = NULL)
 
-    treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC)
+    nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
+    treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
-
-    sim$nonTreePixels <- nonTreePixels
-    sim$treeClasses <- c(1:15, 20, 32, 34:35) ## LCC2005
   } else if (studyAreaName == "ROF") {
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
@@ -497,9 +496,6 @@ Init <- function(sim) {
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
-    sim$nonTreePixels <- nonTreePixels
-    sim$treeClasses <- treeClassesLCC
-
     ## not using FRI for ROF (only covers southern part anyway)
     # if (P(sim)$.resolution == 125L) {
     #   LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1JouBj0iJOPB1qQeXkRRePMN6MZSX_R_q",
@@ -513,6 +509,10 @@ Init <- function(sim) {
     #                         rasterToMatch = sim$rasterToMatchLarge)
     # }
   }
+
+  sim$nonTreePixels <- nonTreePixels
+  sim$treeClasses <- treeClassesLCC
+  sim$nontreeClasses <- nontreeClassesLCC
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   standAgeMapURL <- paste0(
