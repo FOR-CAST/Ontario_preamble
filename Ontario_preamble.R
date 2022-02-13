@@ -1,20 +1,26 @@
 defineModule(sim, list(
   name = "Ontario_preamble",
-  description = "Study area definition and preparation of data required to run fireSense and LandR in the Ontario AOU/ROF.",
+  description = paste("this module prepares 3 sets of objects needed for LandR-fireSense simulations in Ontario AOU/ROF:",
+                      "1. study areas and corresponding rasterToMatch (as well as large versions);",
+                      "2. species equivalencies tables and the sppEquiv column;",
+                      "3. projected and historical climate data for fitting and predicting fires.",
+                      "Each is customized to the study area parameter passed as studyAreaName."),
   keywords = "",
   authors = c(
-    person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca")
+    person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca"),
+    person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
-  version = list(SpaDES.core = "1.0.4.9004", Ontario_preamble = "0.0.0.9000"),
+  version = list(Ontario_preamble = "0.0.0.9000"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list("httr", "raster", "rgeos", "reproducible", "sf", "sp",
-                  "PredictiveEcology/climateData@development (>= 0.0.0.0.9002)",
-                  "PredictiveEcology/fireSenseUtils@development",
-                  "PredictiveEcology/LandR@development"),
+  reqdPkgs = list("archive", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
+                  "PredictiveEcology/reproducible@terraInProjectInputs (>= 1.2.8.9033)",
+                  "PredictiveEcology/fireSenseUtils@development (>= 0.0.4.9014)",
+                  "PredictiveEcology/LandR@development",
+                  "PredictiveEcology/climateData@development (>= 0.0.0.9005)"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -61,6 +67,8 @@ defineModule(sim, list(
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
+    createsOutput("sppEquivCol", objectClass = "character",
+                  desc = "name of column to use in sppEquiv"),
     createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
     createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
@@ -143,15 +151,6 @@ Init <- function(sim) {
   }
 
   ## provincial boundary
-  # canProvs <- Cache(prepInputs,
-  #                   "GADM",
-  #                   fun = "base::readRDS",
-  #                   dlFun = "raster::getData",
-  #                   country = "CAN", level = 1, path = dPath,
-  #                   #targetCRS = sim$targetCRS, ## TODO: fails on Windows
-  #                   targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
-  #                   overwrite = TRUE,
-  #                   destinationPath = dPath) %>% ## TODO: why is this failing?
   canProvs <- getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
 
   mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
@@ -364,6 +363,7 @@ Init <- function(sim) {
                                             Leading = "Cedar leading")]
 
   sim$sppEquiv <- sppEquivalencies_CA[!is.na(ON), ]
+  sim$sppEquivCol <- "ON"
 
   sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, newVals = "Mixed", palette = "Accent")
 
