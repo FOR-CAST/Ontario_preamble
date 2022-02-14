@@ -1,9 +1,8 @@
 defineModule(sim, list(
   name = "Ontario_preamble",
-  description = paste("this module prepares 3 sets of objects needed for LandR-fireSense simulations in Ontario AOU/ROF:",
+  description = paste("this module prepares 2 sets of objects needed for LandR simulations in Ontario AOU/ROF:",
                       "1. study areas and corresponding rasterToMatch (as well as large versions);",
-                      "2. species equivalencies tables and the sppEquiv column;",
-                      "3. projected and historical climate data for fitting and predicting fires.",
+                      "2. species equivalencies tables and the sppEquiv column.",
                       "Each is customized to the study area parameter passed as studyAreaName."),
   keywords = "",
   authors = c(
@@ -19,8 +18,7 @@ defineModule(sim, list(
   reqdPkgs = list("archive", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@terraInProjectInputs (>= 1.2.8.9033)",
                   "PredictiveEcology/fireSenseUtils@development (>= 0.0.4.9014)",
-                  "PredictiveEcology/LandR@development",
-                  "PredictiveEcology/climateData@development (>= 0.0.0.9005)"),
+                  "PredictiveEcology/LandR@development"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
@@ -34,18 +32,10 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
-    defineParameter("climateGCM", "numeric", "CNRM-ESM2-1", NA, NA,
-                    paste("Global Circulation Model to use for climate projections:",
-                          "currently '13GCMs_ensemble', 'CanESM5', 'CNRM-ESM2-1', or 'CCSM4'.")),
-    defineParameter("climateSSP", "numeric", 370, NA, NA,
-                    "SSP emissions scenario for `climateGCM`: one of 245, 370, or 585.",
-                    "[If using 'climateGCM = CCSM4', climateSSP must be one of 45 or 85.]"),
-    defineParameter("historicalFireYears", "numeric", default = 1991:2020, NA, NA,
-                    desc = "range of years captured by the historical climate data"),
-    defineParameter("projectedFireYears", "numeric", default = 2011:2100, NA, NA,
-                    "range of years captured by the projected climate data"),
     defineParameter("runName", "character", "AOU", NA, NA,
-                    paste("Should include one of 'AOU' or 'ROF' to identify the studyArea,",
+                    paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
+                          "(if 'ROF', then 'boreal' or 'plain' should be specified too,",
+                          "to identify whether to run in the Boreal Shield or Hudson Plains ecozone);",
                           "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use."))
   ),
   inputObjects = bindrows(
@@ -53,22 +43,16 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
-    createsOutput("ATAstack", "RasterStack", "annual projected mean annual temperature anomalies, units stored as tenth of a degree"),
-    createsOutput("CMIstack", "RasterStack", "annual projected mean climate moisture deficit"),
-    createsOutput("CMInormal", "RasterLayer", "Climate Moisture Index Normals from 1950-2010"),
-    createsOutput("historicalClimateRasters", "list", desc = "list of RasterStacks of historical MDC calculated from ClimateNA data."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."),
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
-    createsOutput("projectedClimateRasters", "list", desc = "list of RasterStacks of projected MDC calculated from ClimateNA data."),
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
     createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on studyAreaLarge."),
     createsOutput("rasterToMatchReporting", "RasterLayer", desc = "Raster to match based on studyAreaReporting."),
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
-    createsOutput("sppEquivCol", objectClass = "character",
-                  desc = "name of column to use in sppEquiv"),
+    createsOutput("sppEquivCol", objectClass = "character", desc = "name of column to use in sppEquiv"),
     createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
     createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
@@ -145,19 +129,42 @@ Init <- function(sim) {
   studyAreaName <- if (grepl("AOU", runName)) {
     "AOU"
   } else if (grepl("ROF", runName)) {
-    "ROF"
+    if (grepl("boreal", runName)) {
+      "ROF_boreal"
+    } else if (grepl("plain", runName)) {
+      "ROF_plain"
+    }
   } else {
     stop("runName must contain one of 'AOU' or 'ROF'.")
   }
 
   ## provincial boundary
   canProvs <- getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
+  st_crs(canProvs) <- st_crs(canProvs) ## fix "old-style crs" warning from sf
 
   mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
     st_transform(., crs = sim$targetCRS)
 
+  ## ECOZONES
+  ez <- switch(studyAreaName,
+               ROF_boreal = "BOREAL SHIELD",
+               ROF_plain = "HUDSON PLAIN",
+               NULL)
+
+  ecozones <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
+    targetFile = "ecozones.shp",
+    alsoExtract = "similar",
+    fun = "sf::st_read",
+    destinationPath = dPath,
+    targetCRS = sim$targetCRS
+  )
+  ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
+  ecozone <- ecozones[ecozones$ZONE_NAME == ez, ]
+  rm(ecozones)
+
   ## STUDY AREA
-  if (grepl("AOU", toupper(P(sim)$runName))) {
+  if (studyAreaName == "AOU") {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
       destinationPath = dPath,
@@ -183,7 +190,7 @@ Init <- function(sim) {
       team_drive = TRUE
     ) %>%
       as_Spatial(.)
-  } else if (grepl("ROF", toupper(P(sim)$runName))) {
+  } else if (grepl("ROF", studyAreaName)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
@@ -191,6 +198,7 @@ Init <- function(sim) {
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) %>%
+      st_intersection(., ecozone) %>%
       as_Spatial(.)
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
@@ -202,6 +210,7 @@ Init <- function(sim) {
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
     ) %>%
+      st_intersection(., ecozone) %>%
       as_Spatial(.)
   }
 
@@ -240,84 +249,6 @@ Init <- function(sim) {
     sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
     sim$rasterToMatchLarge <- Cache(raster::disaggregate, x = sim$rasterToMatchLarge, fact = 2)
   }
-  ## CLIMATE DATA (used by fireSense)
-  dt <- data.table::fread(file = file.path(dataPath(sim), "climateDataURLs.csv"))
-  historicalClimateURL <- dt[studyArea == "ON" & type == "hist_monthly", GID]
-
-  historicalClimatePath <- checkPath(file.path(dPath, "climate", "historic"), create = TRUE)
-  historicalClimateArchive <- file.path(historicalClimatePath, "Ontario.zip")
-  historicalMDCfile <- file.path(historicalClimatePath, paste0("MDC_historical_", studyAreaName, ".grd"))
-
-  ## need to download and extract w/o prepInputs to preserve folder structure!
-  if (!file.exists(historicalClimateArchive)) {
-    googledrive::drive_download(file = as_id(historicalClimateURL), path = historicalClimateArchive)
-    archive::archive_extract(historicalClimateArchive, historicalClimatePath)
-  }
-
-  historicalMDC <- Cache(
-    makeMDC,
-    inputPath = checkPath(file.path(historicalClimatePath, "Ontario"), create = TRUE),
-    years = P(sim)$historicalFireYears
-  )
-  historicalMDC <- Cache(
-    postProcess,
-    historicalMDC,
-    rasterToMatch = sim$rasterToMatch,
-    studyArea = sim$studyArea,
-    datatype = "INT2U",
-    method = "bilinear",
-    filename2 = historicalMDCfile,
-    useCache = P(sim)$.useCache,
-    quick = "filename2", # Cache treats filenames as files; so it digests the file as an input
-    userTags = c(paste0("histMDC_", P(sim)$studyAreaName), cacheTags)
-  )
-  historicalMDC <- updateStackYearNames(historicalMDC, Par$historicalFireYears)
-
-  compareRaster(historicalMDC, sim$rasterToMatch)
-
-  sim$historicalClimateRasters <- list("MDC" = historicalMDC)
-
-  projectedClimateUrl <- dt[studyArea == "ON" &
-                              GCM == P(sim)$climateGCM &
-                              SSP == P(sim)$climateSSP &
-                              type == "proj_monthly", GID]
-
-  projectedClimatePath <- checkPath(file.path(dPath, "climate", "future",
-                                              paste0(P(sim)$climateGCM, "_ssp", P(sim)$climateSSP)), create = TRUE)
-  projectedClimateArchive <- file.path(dirname(projectedClimatePath),
-                                       paste0("Ontario_", P(sim)$climateGCM, "_ssp",
-                                              P(sim)$climateSSP, ".zip"))
-  projectedMDCfile <- file.path(dirname(projectedClimatePath),
-                                paste0("MDC_future_", P(sim)$climateGCM,
-                                       "_ssp", P(sim)$climateSSP, "_", studyAreaName, ".grd"))
-
-  ## need to download and extract w/o prepInputs to preserve folder structure!
-  if (!file.exists(projectedClimateArchive)) {
-    googledrive::drive_download(file = as_id(projectedClimateUrl), path = projectedClimateArchive)
-    archive::archive_extract(projectedClimateArchive, projectedClimatePath)
-  }
-
-  projectedMDC <- makeMDC( ## TODO: use Cache, but it's getting conused :S
-    inputPath = checkPath(file.path(projectedClimatePath, "Ontario"), create = TRUE),
-    years = P(sim)$projectedFireYears
-  )
-  projectedMDC <- Cache(
-    postProcess,
-    projectedMDC,
-    rasterToMatch = sim$rasterToMatch,
-    studyArea = sim$studyArea,
-    datatype = "INT2U",
-    method = "bilinear",
-    filename2 = projectedMDCfile,
-    useCache = P(sim)$.useCache,
-    quick = "filename2", # Cache treats filenames as files; so it digests the file as an input
-    userTags = c(paste0("projMDC_", P(sim)$studyAreaName),
-                 paste0("projMDC_", P(sim)$climateGCM),
-                 paste0("projMDC_SSP", P(sim)$climateSSP), cacheTags)
-  )
-
-  projectedMDC <- updateStackYearNames(projectedMDC, Par$projectedFireYears)
-  sim$projectedClimateRasters <- list("MDC" = projectedMDC)
 
   ## SPECIES STUFF
   data("sppEquivalencies_CA", package = "LandR")
@@ -365,7 +296,7 @@ Init <- function(sim) {
   sim$sppEquiv <- sppEquivalencies_CA[!is.na(ON), ]
   sim$sppEquivCol <- "ON"
 
-  sim$sppColorVect <- sppColors(sppEquivalencies_CA, sppEquivCol, newVals = "Mixed", palette = "Accent")
+  sim$sppColorVect <- sppColors(sppEquivalencies_CA, sim$sppEquivCol, newVals = "Mixed", palette = "Accent")
 
   sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
 
@@ -428,7 +359,7 @@ Init <- function(sim) {
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
-  } else if (studyAreaName == "ROF") {
+  } else if (grepl("ROF", studyAreaName)) {
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
@@ -573,6 +504,14 @@ Init <- function(sim) {
   standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
   imputedPixID2011 <- which(toChange2011)
   attr(standAgeMap2011, "imputedPixID") <- unique(attr(standAgeMap2011, "imputedPixID"), imputedPixID2011)
+
+  ## TODO: use predicted age map produced using national graund plots (see ROF_age submodule)
+  ## NOTE: this new layer is bad:
+  ##   - modage1: fairly uniform ~100 yrs; but at least it predicts entire ROF area;
+  ##   - modage2: large areas w/o preds (will need to be rerun with a different bam model);
+  ##              HUDSON PLAINS ecozone predictions look fine, but BOREAL SHIELD ones are garbage.
+  ##              so, for now we will only use the predicted ages for the HUDSON PLAINS, overlaying on kNN-adj-ages
+  browser()
 
   ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
 
