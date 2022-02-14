@@ -511,7 +511,7 @@ Init <- function(sim) {
   ##   - modage2: large areas w/o preds (will need to be rerun with a different bam model);
   ##              HUDSON PLAINS ecozone predictions look fine, but BOREAL SHIELD ones are garbage.
   ##              so, for now we will only use the predicted ages for the HUDSON PLAINS, overlaying on kNN-adj-ages
-  browser()
+  browser() ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001?
 
   ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
 
