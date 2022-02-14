@@ -36,7 +36,10 @@ defineModule(sim, list(
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
                           "(if 'ROF', then 'boreal' or 'plain' should be specified too,",
                           "to identify whether to run in the Boreal Shield or Hudson Plains ecozone);",
-                          "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use."))
+                          "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use.")),
+    defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
+                    paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
+                          "if FALSE, use Raquel's predicted age map from ROF_age."))
   ),
   inputObjects = bindrows(
     expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
@@ -446,117 +449,131 @@ Init <- function(sim) {
   sim$nontreeClasses <- nontreeClassesLCC
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
-  standAgeMapURL <- paste0(
-    "http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
-    "canada-forests-attributes_attributs-forests-canada/2001-attributes_attributs-2001/",
-    "NFI_MODIS250m_2001_kNN_Structure_Stand_Age_v1.tif"
-  )
-  standAgeMapFileName <- basename(standAgeMapURL)
+  if (isTRUE(P(sim)$useAgeMapkNN)) {
+    standAgeMapURL <- paste0(
+      "http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+      "canada-forests-attributes_attributs-forests-canada/2001-attributes_attributs-2001/",
+      "NFI_MODIS250m_2001_kNN_Structure_Stand_Age_v1.tif"
+    )
+    standAgeMapFileName <- basename(standAgeMapURL)
 
-  fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
-  fireYear <- Cache(prepInputsFireYear,
-                    earliestYear = 1950,
-                    url = fireURL,
-                    fun = "sf::st_read",
-                    destinationPath = dPath,
-                    rasterToMatch = sim$rasterToMatchLarge)
-  fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
+    fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
+    fireYear <- Cache(prepInputsFireYear,
+                      earliestYear = 1950,
+                      url = fireURL,
+                      fun = "sf::st_read",
+                      destinationPath = dPath,
+                      rasterToMatch = sim$rasterToMatchLarge)
+    fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
 
-  standAgeMap2001 <- Cache(
-    LandR::prepInputsStandAgeMap,
-    ageUrl = standAgeMapURL,
-    rasterToMatch = sim$rasterToMatchLarge,
-    studyArea = sim$studyAreaLarge,
-    destinationPath = dPath,
-    startTime = 2001,
-    fireURL = fireURL,
-    filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
-    userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
-  )
+    standAgeMap2001 <- Cache(
+      LandR::prepInputsStandAgeMap,
+      ageUrl = standAgeMapURL,
+      rasterToMatch = sim$rasterToMatchLarge,
+      studyArea = sim$studyAreaLarge,
+      destinationPath = dPath,
+      startTime = 2001,
+      fireURL = fireURL,
+      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
+      userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+    )
 
-  standAgeMap2011 <- Cache(
-    LandR::prepInputsStandAgeMap,
-    ageURL = paste0("https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
-                    "canada-forests-attributes_attributs-forests-canada/",
-                    "2011-attributes_attributs-2011/",
-                    "NFI_MODIS250m_2011_kNN_Structure_Stand_Age_v1.tif"),
-    rasterToMatch = sim$rasterToMatchLarge,
-    studyArea = sim$studyAreaLarge,
-    destinationPath = dPath,
-    startTime = 2011,
-    fireURL = fireURL,
-    filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
-    userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
-  )
+    standAgeMap2011 <- Cache(
+      LandR::prepInputsStandAgeMap,
+      ageURL = paste0("https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                      "canada-forests-attributes_attributs-forests-canada/",
+                      "2011-attributes_attributs-2011/",
+                      "NFI_MODIS250m_2011_kNN_Structure_Stand_Age_v1.tif"),
+      rasterToMatch = sim$rasterToMatchLarge,
+      studyArea = sim$studyAreaLarge,
+      destinationPath = dPath,
+      startTime = 2011,
+      fireURL = fireURL,
+      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
+      userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+    )
 
-  ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
-  ## now, adjust pixels which are younger than oldest fires upward
-  earliestFireYear <- as.integer(minValue(fireYear))
-  minNonDisturbedAge2001 <- 2001L - earliestFireYear
+    ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
+    ## now, adjust pixels which are younger than oldest fires upward
+    earliestFireYear <- as.integer(minValue(fireYear))
+    minNonDisturbedAge2001 <- 2001L - earliestFireYear
 
-  toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
-  standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
-  imputedPixID2001 <- which(toChange2001)
-  attr(standAgeMap2001, "imputedPixID") <- unique(attr(standAgeMap2001, "imputedPixID"), imputedPixID2001)
+    toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
+    standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
+    imputedPixID2001 <- which(toChange2001)
+    attr(standAgeMap2001, "imputedPixID") <- unique(attr(standAgeMap2001, "imputedPixID"), imputedPixID2001)
 
-  minNonDisturbedAge2011 <- 2011L - earliestFireYear
-  toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
-  standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
-  imputedPixID2011 <- which(toChange2011)
-  attr(standAgeMap2011, "imputedPixID") <- unique(attr(standAgeMap2011, "imputedPixID"), imputedPixID2011)
+    minNonDisturbedAge2011 <- 2011L - earliestFireYear
+    toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
+    standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
+    imputedPixID2011 <- which(toChange2011)
+    attr(standAgeMap2011, "imputedPixID") <- unique(attr(standAgeMap2011, "imputedPixID"), imputedPixID2011)
 
-  ## TODO: use predicted age map produced using national graund plots (see ROF_age submodule)
-  ## NOTE: this new layer is bad:
-  ##   - modage1: fairly uniform ~100 yrs; but at least it predicts entire ROF area;
-  ##   - modage2: large areas w/o preds (will need to be rerun with a different bam model);
-  ##              HUDSON PLAINS ecozone predictions look fine, but BOREAL SHIELD ones are garbage.
-  ##              so, for now we will only use the predicted ages for the HUDSON PLAINS, overlaying on kNN-adj-ages
-  browser() ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001?
+    ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
+    if (FALSE) {
+      ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
+      if (studyAreaName == "AOU") {
+        standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
+                                     destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
+                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                     rasterToMatch = sim$rasterToMatchLarge,
+                                     userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+        refYearMapFRI <- prepInputs(url = "",
+                                    destinationPath = dPath, filename2 = "",
+                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                    rasterToMatch = sim$rasterToMatchLarge,
+                                    userTags = c("refYearMapFRI", studyAreaName, currentModule(sim)))
+      } else if (studyAreaName == "ROF") {
+        # if (P(sim)$.resolution == 125L) {
+        #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
+        #                                destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
+        #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+        #                                rasterToMatch = sim$rasterToMatchLarge,
+        #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+        # } else if (P(sim)$.resolution == 250L) {
+        #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
+        #                                destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
+        #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+        #                                rasterToMatch = sim$rasterToMatchLarge,
+        #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+        # }
+      }
+      standAgeMapFRI <- setMinMax(standAgeMapFRI)
+      standAgeMapFRI[standAgeMapFRI < 0] <- 0L
 
-  ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
+      # TODO:
+      #   1. adjust each age by reference year, for 2001 and 2011 to get age in 2001 and 2011
+      #   2. any values < 0, set as NA. we will fall back to kNN values for these
 
-  if (FALSE) {
-    ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
-    if (studyAreaName == "AOU") {
-      standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
-                                   destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
-                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-                                   rasterToMatch = sim$rasterToMatchLarge,
-                                   userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
-      refYearMapFRI <- prepInputs(url = "",
-                                  destinationPath = dPath, filename2 = "",
-                                  fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-                                  rasterToMatch = sim$rasterToMatchLarge,
-                                  userTags = c("refYearMapFRI", studyAreaName, currentModule(sim)))
-    } else if (studyAreaName == "ROF") {
-      # if (P(sim)$.resolution == 125L) {
-      #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
-      #                                destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
-      #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-      #                                rasterToMatch = sim$rasterToMatchLarge,
-      #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
-      # } else if (P(sim)$.resolution == 250L) {
-      #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
-      #                                destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
-      #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-      #                                rasterToMatch = sim$rasterToMatchLarge,
-      #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
-      # }
+      ## 2001 age map
+      standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+      standAgeMap2001[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+
+      ## 2011 age map
+      standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
+      standAgeMap2011[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
     }
-    standAgeMapFRI <- setMinMax(standAgeMapFRI)
-    standAgeMapFRI[standAgeMapFRI < 0] <- 0L
+  } else {
+    ## NOTE: this new layer is bad:
+    ##   - modage1: fairly uniform ~100 yrs; but at least it predicts entire ROF area;
+    ##   - modage2: large areas w/o preds (will need to be rerun with a different bam model);
+    ##              HUDSON PLAINS ecozone predictions look fine, but BOREAL SHIELD ones are garbage.
+    ##              so, for now we will only use the predicted ages for the HUDSON PLAINS, overlaying on kNN-adj-ages
+    modageMap <- prepInputs(
+      url = "https://drive.google.com/file/d/1bfT5gUonIHVDAbgYIsDo2gE1qAUbMoli/", ## modage1,
+      #url = "https://drive.google.com/file/d/139jxdQbzKjcUWLe87Ockqs8sMhsB_Jjz/", ## modage2
+      fun = "raster::raster",
+      destinationPath = dPath,
+      rasterToMatch = sim$rasterToMatchLarge
+    )
+    imputedPixID <- which(!is.na(modageMap[])) ## all pixels imputed
 
-    # TODO:
-    #   1. adjust each age by reference year, for 2001 and 2011 to get age in 2001 and 2011
-    #   2. any values < 0, set as NA. we will fall back to kNN values for these
+    ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001?
+    standAgeMap2001 <- modageMap - 14L
+    attr(standAgeMap2001, "imputedPixID") <- imputedPixID
 
-    ## 2001 age map
-    standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-    standAgeMap2001[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
-
-    ## 2011 age map
-    standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-    standAgeMap2011[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+    standAgeMap2011 <- modageMap - 4L
+    attr(standAgeMap2011, "imputedPixID") <- imputedPixID
   }
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
