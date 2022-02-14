@@ -34,7 +34,7 @@ defineModule(sim, list(
                           "and time are not relevant")),
     defineParameter("runName", "character", "AOU", NA, NA,
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
-                          "(if 'ROF', then 'boreal' or 'plain' should be specified too,",
+                          "(if 'ROF', then 'shield' or 'plain' should be specified too,",
                           "to identify whether to run in the Boreal Shield or Hudson Plains ecozone);",
                           "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
@@ -132,8 +132,8 @@ Init <- function(sim) {
   studyAreaName <- if (grepl("AOU", runName)) {
     "AOU"
   } else if (grepl("ROF", runName)) {
-    if (grepl("boreal", runName)) {
-      "ROF_boreal"
+    if (grepl("boreal|shield", runName)) {
+      "ROF_shield"
     } else if (grepl("plain", runName)) {
       "ROF_plain"
     }
@@ -150,7 +150,7 @@ Init <- function(sim) {
 
   ## ECOZONES
   ez <- switch(studyAreaName,
-               ROF_boreal = "BOREAL SHIELD",
+               ROF_shield = "BOREAL SHIELD",
                ROF_plain = "HUDSON PLAIN",
                NULL)
 
