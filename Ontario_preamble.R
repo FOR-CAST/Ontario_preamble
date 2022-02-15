@@ -206,15 +206,16 @@ Init <- function(sim) {
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
-    studyAreaLarge <- prepInputs(
-      url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
-      targetCRS = sim$targetCRS, ## TODO: fails on Windows
-      targetFile = "ROF_RA_def_50km_buff.shp", alsoExtract = "similar",
-      fun = "sf::st_read", destinationPath = dPath,
-      filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
-    ) %>%
-      st_intersection(., ecozone) %>%
-      as_Spatial(.)
+    studyAreaLarge <- buffer(studyAreaReporting, 50000) ## 50 km buffer
+    # studyAreaLarge <- prepInputs(
+    #   url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
+    #   targetCRS = sim$targetCRS, ## TODO: fails on Windows
+    #   targetFile = "ROF_RA_def_50km_buff.shp", alsoExtract = "similar",
+    #   fun = "sf::st_read", destinationPath = dPath,
+    #   filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
+    # ) %>%
+    #   st_intersection(., ecozone) %>%
+    #   as_Spatial(.)
   }
 
   ## define test study area
