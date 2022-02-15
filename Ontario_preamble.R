@@ -142,7 +142,7 @@ Init <- function(sim) {
   }
 
   ## provincial boundary
-  canProvs <- getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
+  canProvs <- raster::getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
   st_crs(canProvs) <- st_crs(canProvs) ## fix "old-style crs" warning from sf
 
   mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
