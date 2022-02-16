@@ -206,7 +206,7 @@ Init <- function(sim) {
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
-    studyAreaLarge <- buffer(studyAreaReporting, 50000) ## 50 km buffer
+    studyAreaLarge <- studyArea
     # studyAreaLarge <- prepInputs(
     #   url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
     #   targetCRS = sim$targetCRS, ## TODO: fails on Windows
