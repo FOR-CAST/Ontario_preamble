@@ -36,7 +36,7 @@ defineModule(sim, list(
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
                           "(if 'ROF', then 'shield' or 'plain' should be specified too,",
                           "to identify whether to run in the Boreal Shield or Hudson Plains ecozone);",
-                          "as well as 'CCSM4_RCP45' or 'CCSM4_RCP85' to identify the climate scenario to use.")),
+                          "as well as 'CanESM5_SSP370' or 'CNRM-ESM2-1_SSP370' (or SSP585) to identify the climate scenario to use.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
                     paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
                           "if FALSE, use Raquel's predicted age map from ROF_age."))
