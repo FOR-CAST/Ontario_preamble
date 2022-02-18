@@ -1,7 +1,7 @@
 ---
 title: "Ontario_preamble"
 author: "Alex Chubaty"
-date: "17 February 2022"
+date: "18 February 2022"
 output:
   html_document:
     df_print: paged
@@ -28,6 +28,7 @@ Provide a summary of user-visible parameters.
 |.saveInitialTime |numeric    |NA      |NA  |NA  |Describes the simulation time at which the first save event should occur.                                                                                                                                                                                                                                       |
 |.saveInterval    |numeric    |NA      |NA  |NA  |This describes the simulation time interval between save events.                                                                                                                                                                                                                                                |
 |.useCache        |logical    |FALSE   |NA  |NA  |Should this entire module be run with caching activated? This is generally intended for data-type modules, where stochasticity and time are not relevant                                                                                                                                                        |
+|.resolution      |numeric    |250     |NA  |NA  |raster pixel size, in m, to use for simulation. Either 250 or 125.                                                                                                                                                                                                                                              |
 |runName          |character  |AOU     |NA  |NA  |Should include one of 'AOU' or 'ROF' to identify the studyArea (if 'ROF', then 'shield' or 'plain' should be specified too, to identify whether to run in the Boreal Shield or Hudson Plains ecozone); as well as 'CanESM5_SSP370' or 'CNRM-ESM2-1_SSP370' (or SSP585) to identify the climate scenario to use. |
 |useAgeMapkNN     |logical    |FALSE   |NA  |NA  |if TRUE, use kNN age maps, corrected with fire polygons data; if FALSE, use Raquel's predicted age map from ROF_age.                                                                                                                                                                                            |
 
