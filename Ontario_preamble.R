@@ -236,6 +236,7 @@ Init <- function(sim) {
                              destinationPath = dPath,
                              useCache = P(sim)$.useCache,
                              filename2 = paste0(studyAreaName, '_rtm.tif'))
+
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005, ## TODO: use 2010
                                   studyArea = sim$studyAreaLarge,
@@ -249,9 +250,13 @@ Init <- function(sim) {
                                       useCache = P(sim)$.useCache,
                                       filename2 = paste0(studyAreaName, '_rtmr.tif'))
 
-  if (P(sim)$.resolution == 125L) {
-    sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
-    sim$rasterToMatchLarge <- Cache(raster::disaggregate, x = sim$rasterToMatchLarge, fact = 2)
+  if (grepl("ROF", studyAreaName)) {
+    if (unique(res(rasterToMatch)) == 250) {
+      ## ROF uses 125m pixels
+      sim$rasterToMatch <- raster::disaggregate(sim$rasterToMatch, fact = 2)
+      sim$rasterToMatchLarge <- raster::disaggregate(sim$rasterToMatchLarge, fact = 2)
+      sim$rasterToMatchReporting <- raster::disaggregate(sim$rasterToMatchReporting, fact = 2)
+    }
   }
 
   ## SPECIES STUFF
