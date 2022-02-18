@@ -32,6 +32,8 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
+    defineParameter(".resolution", "numeric", 250, NA, NA,
+                    "raster pixel size, in m,  to use for simulation. Either 250 or 125."),
     defineParameter("runName", "character", "AOU", NA, NA,
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
                           "(if 'ROF', then 'shield' or 'plain' should be specified too,",
@@ -140,6 +142,8 @@ Init <- function(sim) {
   } else {
     stop("runName must contain one of 'AOU' or 'ROF'.")
   }
+
+  stopifnot(P(sim)$.resolution %in% c(125, 250))
 
   ## provincial boundary
   canProvs <- raster::getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
@@ -250,8 +254,9 @@ Init <- function(sim) {
                                       filename2 = paste0(studyAreaName, '_rtmr.tif'))
 
   if (P(sim)$.resolution == 125L) {
-    sim$rasterToMatch <- Cache(raster::disaggregate, x = sim$rasterToMatch, fact = 2)
-    sim$rasterToMatchLarge <- Cache(raster::disaggregate, x = sim$rasterToMatchLarge, fact = 2)
+    sim$rasterToMatch <- raster::disaggregate(sim$rasterToMatch, fact = 2)
+    sim$rasterToMatchLarge <- raster::disaggregate(sim$rasterToMatchLarge, fact = 2)
+    sim$rasterToMatchReporting <- raster::disaggregate(sim$rasterToMatchReporting, fact = 2)
   }
 
   ## SPECIES STUFF
@@ -266,7 +271,7 @@ Init <- function(sim) {
   if (studyAreaName == "AOU") {
     LCC2005 <- prepInputsLCC(year = 2005, studyArea = sim$studyAreaLarge, destinationPath = dPath) ## TODO: use LCC2010
     if (P(sim)$.resolution == 125L) {
-      LCC2005 <- Cache(raster::disaggregate, x = LCC2005, fact = 2)
+      LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
@@ -374,14 +379,15 @@ Init <- function(sim) {
     r17 <- raster(f[3]) %>% projectRaster(., t17, method = "ngb", datatype = "INT2U")
 
     LCC_FN <- raster::mosaic(r15, r16, r17, fun = min)
-    LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## a few pixels have values >24, so make them NA
+    LCC_FN[LCC_FN[] <= 0] <- NA_integer_ ## remove 0, -9, and -99
+    LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
     LCC_FN <- Cache(postProcess, LCC_FN, method = "ngb", rasterToMatch = sim$rasterToMatchLarge)
 
     ##### Far North cover classes described in `Far North Land Cover - Data Specification.pdf`
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
-    treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes
+    treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes -- reclassify them
     treePixelsFN_TF <- LCC_FN[] %in% treeClassesLCC
-    LandTypeFN_NA <- is.na(LCC_FN[])# || (LCC_FN[] %in% c(-9, -99))
+    LandTypeFN_NA <- is.na(LCC_FN[])
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
