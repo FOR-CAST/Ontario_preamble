@@ -17,7 +17,6 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
   reqdPkgs = list("archive", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@terraInProjectInputs (>= 1.2.8.9033)",
-                  "PredictiveEcology/fireSenseUtils@development (>= 0.0.4.9014)",
                   "PredictiveEcology/LandR@development"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
