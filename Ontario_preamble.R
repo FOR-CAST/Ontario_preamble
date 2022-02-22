@@ -244,20 +244,20 @@ Init <- function(sim) {
                              studyArea = sim$studyArea,
                              destinationPath = dPath,
                              useCache = P(sim)$.useCache,
-                             filename2 = paste0(studyAreaName, '_rtm.tif'))
+                             filename2 = paste0(studyAreaName, "_rtm.tif"))
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005, ## TODO: use 2010
                                   studyArea = sim$studyAreaLarge,
                                   destinationPath = dPath,
                                   useCache = P(sim)$.useCache,
-                                  filename2 = paste0(studyAreaName, '_rtml.tif'))
+                                  filename2 = paste0(studyAreaName, "_rtml.tif"))
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005, ## TODO: use 2010
                                       studyArea = sim$studyAreaReporting,
                                       destinationPath = dPath,
                                       useCache = P(sim)$.useCache,
-                                      filename2 = paste0(studyAreaName, '_rtmr.tif'))
+                                      filename2 = paste0(studyAreaName, "_rtmr.tif"))
 
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- raster::disaggregate(sim$rasterToMatch, fact = 2)
@@ -419,8 +419,9 @@ Init <- function(sim) {
     # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
 
+    nIterations <- ifelse(grepl("ROF_shield", studyAreaName), 3, 3) ## TODO: revisit this
     LCC_FN <- LandR::convertUnwantedLCC2(classesToReplace = 19:20, rstLCC = LCC_FN,
-                                         nIterations = 3, defaultNewValue = 18,
+                                         nIterations = nIterations, defaultNewValue = 18,
                                          invalidClasses = c(1:5, 21:24))
 
     sim$LCC <- LCC_FN
@@ -436,10 +437,10 @@ Init <- function(sim) {
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
     fireSenseForestedLCC <- c(15:18)
-    nonflammableLCC <- c(1:6, 21:23)
+    nonflammableLCC <- c(1:6, 21:23, 24) ## TODO: reassess agriculture class 24
     nonForestLCCGroups <- list(
-      "FenPlus" = c(7, 8, 10, 11, 12, 24),
-      "BogSwamp" = c(9, 13, 14)
+      "FenPlus" = c(7:8, 10:12),
+      "BogSwamp" = c(9, 13:14)
     )
     sim$missingLCCGroup <- "BogSwamp"
   }
@@ -451,7 +452,7 @@ Init <- function(sim) {
   sim$nonflammableLCC <- nonflammableLCC
 
   sim$nonTreePixels <- nonTreePixels
-  sim$treeClasses <- sim$LandRforestedLCC ## TODO review what this is used for
+  sim$treeClasses <- sim$LandRforestedLCC
   sim$nontreeClasses <- nontreeClassesLCC
   sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
 
