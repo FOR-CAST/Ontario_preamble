@@ -51,6 +51,7 @@ defineModule(sim, list(
     createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be nonflammable"),
+    createsOutput("nonForestedLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
     createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), #TODO what is this used for?
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), #TODO: what is this used for?
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
