@@ -17,7 +17,7 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
   reqdPkgs = list("archive", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@terraInProjectInputs (>= 1.2.8.9033)",
-                  "PredictiveEcology/LandR@development"),
+                  "PredictiveEcology/LandR@development (>= 1.0.7.9004)"),
   parameters = rbind(
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
