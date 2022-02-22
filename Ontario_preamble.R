@@ -279,6 +279,7 @@ Init <- function(sim) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
+    sim$nonflammableLCC  <- c(0, 25, 30, 33, 36:39)
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     uniqueLCCclasses <- na.omit(unique(LCC2005[]))
     nontreeClassesLCC <- sort(uniqueLCCclasses[!uniqueLCCclasses %in% treeClassesLCC])
@@ -338,8 +339,9 @@ Init <- function(sim) {
 
     stop("figure out what nonForestedLCCGroups is with LCC2005...")
     sim$nonForestLCCGroups <- list(
-      "nonForest_highFlam" = c(8, 10, 14),#shrubland, grassland, wetland
-      "nonForest_lowFlam" = c(11, 12, 15))
+      nonForest_highFlam = c(16:19, 22),
+      nonForest_lowFlam = c(21, 23:24, 26:29, 31)
+    )
     sim$missingLCCGroup <- "nonForest_highFlam"
 
 
@@ -424,7 +426,7 @@ Init <- function(sim) {
                                           invalidClasses = c(1:5, 21:24))
 
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
-    LandRforestedLCC <- c(9, 11, 14, 15:18)
+    LandRforestedLCC <- c(9:11, 14, 15:18)
     fireSenseForestedLCC <- c(15:18)
     # treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes -- reclassify them
     sim$nonflammableLCC <- c(1:6, 21:23) #assumes agriculture is flammmable...
