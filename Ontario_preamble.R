@@ -448,7 +448,7 @@ Init <- function(sim) {
       "BogSwamp" = c(9, 13, 14)) #coniferous swamp, open bog, treed bog. These burn at ~2x the rate of other non-forest classes
     sim$missingLCCGroup <- "BogSwamp"
   }
-  sim$LCC <- asInteger(sim$LCC)
+  sim$LCC <- setValues(sim$LCC, asInteger(getValues(sim$LCC)))
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonTreePixels <- nonTreePixels
