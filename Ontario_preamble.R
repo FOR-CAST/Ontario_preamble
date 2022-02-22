@@ -280,7 +280,6 @@ Init <- function(sim) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
-    sim$nonflammableLCC  <- c(0, 25, 30, 33, 36:39)
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     uniqueLCCclasses <- na.omit(unique(LCC2005[]))
     nontreeClassesLCC <- sort(uniqueLCCclasses[!uniqueLCCclasses %in% treeClassesLCC])
@@ -335,17 +334,15 @@ Init <- function(sim) {
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
     LandRforestClasses <- treeClassesLCC
-    fireSenseForestClasses <- treeClassesLCC
     sim$nonForestClasses <- nontreeClassesLCC
 
-    stop("figure out what nonForestedLCCGroups is with LCC2005...")
-    sim$nonForestLCCGroups <- list(
+    fireSenseForestedLCC <- treeClassesLCC
+    nonflammableLCC  <- c(0, 25, 30, 33, 36:39)
+    nonForestLCCGroups <- list(
       nonForest_highFlam = c(16:19, 22),
       nonForest_lowFlam = c(21, 23:24, 26:29, 31)
     )
     sim$missingLCCGroup <- "nonForest_highFlam"
-
-
   } else if (grepl("ROF", studyAreaName)) {
 
     ## FAR NORTH LANDCOVER (620 MB)
@@ -404,16 +401,15 @@ Init <- function(sim) {
     LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
     LCC_FN <- Cache(postProcess, LCC_FN, method = "ngb", rasterToMatch = sim$rasterToMatchLarge)
 
-    #LandR forest classes are distinct from fireSense forest classes, in that
-    #fireSense assesses forest by the dominant species composition (i.e. fuel class) and not the landcover.
-    #however, fire may be strongly influenced by landcover (e.g., wetland) therefore
-    #fireSense forest classes are restricted to upland forest classes, unlike LandR
-    #Here we reclassify disturbed to it's nearest valid (i.e. flammable) class using an expanding focal window
-    #If no suitable pixel is found in the neighbouring 3-pixel locus, coniferous forest class is assigned by default
-    #this would mean the pixel is at the center of a (7*125m^2) = 75 ha patch)
+    ## LandR forest classes are distinct from fireSense forest classes, in that
+    ## fireSense assesses forest by the dominant species composition (i.e. fuel class) and not the landcover.
+    ## however, fire may be strongly influenced by landcover (e.g., wetland) therefore
+    ## fireSense forest classes are restricted to upland forest classes, unlike LandR
+    ## Here we reclassify disturbed to it's nearest valid (i.e. flammable) class using an expanding focal window
+    ## If no suitable pixel is found in the neighbouring 3-pixel locus, coniferous forest class is assigned by default
+    ## this would mean the pixel is at the center of a (7*125m^2) = 75 ha patch)
 
-
-    ##### Far North cover classes described in `Far North Land Cover - Data Specification.pdf`
+    ## Far North cover classes described in `Far North Land Cover - Data Specification.pdf`
     # "Clear Open Water" = 1, "Turbid Water" = 2, "Intertidal Mudflat" = 3,
     # "Intertidal Marsh" = 4, "Supratidal Marsh" = 5, "Fresh Water Marsh" = 6,
     # "Heath" = 7, "Thicket Swamp" = 8, "Coniferous Swamp" = 9, "Deciduous Swamp" = 10,
@@ -422,39 +418,50 @@ Init <- function(sim) {
     # "Disturbance - Non and sparse-woody" = 19, "Disturbance - Treed or shrub" = 20,
     # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
+
     LCC_FN <- LandR::convertUnwantedLCC2(classesToReplace = 19:20, rstLCC = LCC_FN,
-                                          nIterations = 3, defaultNewValue = 18,
-                                          invalidClasses = c(1:5, 21:24))
+                                         nIterations = 3, defaultNewValue = 18,
+                                         invalidClasses = c(1:5, 21:24))
 
     sim$LCC <- LCC_FN
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
-    LandRforestedLCC <- c(9:11, 14, 15:18)
-    fireSenseForestedLCC <- c(15:18)
-    # treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes -- reclassify them
-    sim$nonflammableLCC <- c(1:6, 21:23) #assumes agriculture is flammmable...
+    LandRforestedLCC <- c(9:10, 12, 14, 15:18)
 
     treePixelsFN_TF <- LCC_FN[] %in% LandRforestedLCC
     LandTypeFN_NA <- is.na(LCC_FN[])
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
-
     treePixelsLCC <- which(sim$LCC[] %in% LandRforestedLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
-    sim$nonForestLCCGroups <- list(
-      "FenPlus" = c(7, 8, 10, 11, 12, 24), #heath, thicket swamp, deciduous swamp, open fen, treed fen, agriculture
-      #ag/heath/deciduous swamp are present in trivial amounts
-      "BogSwamp" = c(9, 13, 14)) #coniferous swamp, open bog, treed bog. These burn at ~2x the rate of other non-forest classes
+    fireSenseForestedLCC <- c(15:18)
+    nonflammableLCC <- c(1:6, 21:23)
+    nonForestLCCGroups <- list(
+      "FenPlus" = c(7, 8, 10, 11, 12, 24),
+      "BogSwamp" = c(9, 13, 14)
+    )
     sim$missingLCCGroup <- "BogSwamp"
   }
+
   sim$LCC <- setValues(sim$LCC, asInteger(getValues(sim$LCC)))
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
+  sim$nonForestLCCGroups <- nonForestLCCGroups
+  sim$nonflammableLCC <- nonflammableLCC
+
   sim$nonTreePixels <- nonTreePixels
-  sim$treeClasses <- sim$LandRforestedLCC #TODO review what this is used for
+  sim$treeClasses <- sim$LandRforestedLCC ## TODO review what this is used for
   sim$nontreeClasses <- nontreeClassesLCC
   sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
+
+  # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
+  allClasses <- if (grepl("ROF", studyAreaName)) {
+    1:24
+  } else {
+    1:39
+  }
+  stopifnot(all(allClasses %in% c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   if (isTRUE(P(sim)$useAgeMapkNN)) {
@@ -582,13 +589,6 @@ Init <- function(sim) {
 
     standAgeMap2011 <- modageMap - 4L
     attr(standAgeMap2011, "imputedPixID") <- imputedPixID
-  }
-
-  # compare nonForest classes with `simOutPreamble[["treeClasses"]]`
-  if (grepl("ROF", studyAreaName)) {
-    all(1:24 %in% c(sim$fireSenseForestClasses, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC))
-  } else {
-    all(1:39 %in% c(sim$fireSenseForestClasses, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC))
   }
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
