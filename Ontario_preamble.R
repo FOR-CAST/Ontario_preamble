@@ -48,6 +48,7 @@ defineModule(sim, list(
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
     createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSEnse."),
+    createsOutput("flammableRTM", "RasterLayer", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("missingLCCgroup", "character", "the group in nonForestLCCGroups that describes forested pixels omitted by LandR"),
@@ -425,6 +426,7 @@ Init <- function(sim) {
                                           nIterations = 3, defaultNewValue = 18,
                                           invalidClasses = c(1:5, 21:24))
 
+    sim$LCC <- LCC_FN
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
     LandRforestedLCC <- c(9:11, 14, 15:18)
     fireSenseForestedLCC <- c(15:18)
@@ -436,7 +438,7 @@ Init <- function(sim) {
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
-    sim$LCC <- asInteger(LCC_FN)
+
     treePixelsLCC <- which(sim$LCC[] %in% LandRforestedLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
@@ -446,11 +448,13 @@ Init <- function(sim) {
       "BogSwamp" = c(9, 13, 14)) #coniferous swamp, open bog, treed bog. These burn at ~2x the rate of other non-forest classes
     sim$missingLCCGroup <- "BogSwamp"
   }
+  sim$LCC <- asInteger(sim$LCC)
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonTreePixels <- nonTreePixels
   sim$treeClasses <- sim$LandRforestedLCC #TODO review what this is used for
   sim$nontreeClasses <- nontreeClassesLCC
+  sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   if (isTRUE(P(sim)$useAgeMapkNN)) {
@@ -578,6 +582,13 @@ Init <- function(sim) {
 
     standAgeMap2011 <- modageMap - 4L
     attr(standAgeMap2011, "imputedPixID") <- imputedPixID
+  }
+
+  # compare nonForest classes with `simOutPreamble[["treeClasses"]]`
+  if (grepl("ROF", studyAreaName)) {
+    all(1:24 %in% c(sim$fireSenseForestClasses, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC))
+  } else {
+    all(1:39 %in% c(sim$fireSenseForestClasses, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC))
   }
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
