@@ -47,9 +47,12 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
+    createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSEnse."),
+    createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
-    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."),
-    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"),
+    createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be nonflammable"),
+    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), #TODO what is this used for?
+    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), #TODO: what is this used for?
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
     createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on studyAreaLarge."),
     createsOutput("rasterToMatchReporting", "RasterLayer", desc = "Raster to match based on studyAreaReporting."),
@@ -65,8 +68,8 @@ defineModule(sim, list(
                   paste("this area will be used to subset PSP plots before building the statistical model.",
                         "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
                         "Alberta, and Boreal British Columbia")),
-    createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing."),
-    createsOutput("treeClasses", "integer", desc = "vector of LCC classes considered to be forested/treed.")
+    createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing.")
+
   )
 ))
 
@@ -326,7 +329,19 @@ Init <- function(sim) {
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
+
+    LandRforestClasses <- treeClassesLCC
+    fireSenseForestClasses <- treeClassesLCC
+    sim$nonForestClasses <- nontreeClassesLCC
+
+    stop("figure out what nonForestedLCCGroups is with LCC2005...")
+    sim$nonForestedLCCGroups <- list(
+      "nonForest_highFlam" = c(8, 10, 14),#shrubland, grassland, wetland
+      "nonForest_lowFlam" = c(11, 12, 15))
+
+
   } else if (grepl("ROF", studyAreaName)) {
+
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
@@ -383,34 +398,52 @@ Init <- function(sim) {
     LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
     LCC_FN <- Cache(postProcess, LCC_FN, method = "ngb", rasterToMatch = sim$rasterToMatchLarge)
 
+    #LandR forest classes are distinct from fireSense forest classes, in that
+    #fireSense assesses forest by the dominant species composition (i.e. fuel class) and not the landcover.
+    #however, fire may be strongly influenced by landcover (e.g., wetland) therefore
+    #fireSense forest classes are restricted to upland forest classes, unlike LandR
+    #Here we reclassify disturbed to it's nearest valid (i.e. flammable) class using an expanding focal window
+    #If no suitable pixel is found in the neighbouring 3-pixel locus, coniferous forest class is assigned by default
+    #this would mean the pixel is at the center of a (7*125m^2) = 75 ha patch)
+
+
     ##### Far North cover classes described in `Far North Land Cover - Data Specification.pdf`
+    # "Clear Open Water" = 1, "Turbid Water" = 2, "Intertidal Mudflat" = 3,
+    # "Intertidal Marsh" = 4, "Supratidal Marsh" = 5, "Fresh Water Marsh" = 6,
+    # "Heath" = 7, "Thicket Swamp" = 8, "Coniferous Swamp" = 9, "Deciduous Swamp" = 10,
+    # "Open Fen" = 11, "Treed Fen" = 12, "Open Bog" = 13, "Treed Bog" = 14,
+    # "Sparse Treed" = 15, "Deciduous Treed" = 16, "Mixed Treed" = 17, "Coniferous Treed" = 18,
+    # "Disturbance - Non and sparse-woody" = 19, "Disturbance - Treed or shrub" = 20,
+    # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
+    # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
+    LCC_FN <- LandR::convertUnwantedLCC2(classesToReplace = 19:20, rstLCC = LCC_FN,
+                                          nIterations = 3, defaultNewValue = 18,
+                                          invalidClasses = c(1:5, 21:24))
+
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
-    treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes -- reclassify them
-    treePixelsFN_TF <- LCC_FN[] %in% treeClassesLCC
+    LandRforestedLCC <- c(9, 11, 14, 15:18)
+    fireSenseForestedLCC <- c(15:18)
+    # treeClassesLCC <- c(9:10, 12, 14:18, 19:20) ## NOTE: 19:20 are disturbed classes -- reclassify them
+    sim$nonflammableLCC <- c(1:6, 21:23) #assumes agriculture is flammmable...
+
+    treePixelsFN_TF <- LCC_FN[] %in% LandRforestedLCC
     LandTypeFN_NA <- is.na(LCC_FN[])
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
     sim$LCC <- asInteger(LCC_FN)
-    treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC)
+    treePixelsLCC <- which(sim$LCC[] %in% LandRforestedLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
-    ## not using FRI for ROF (only covers southern part anyway)
-    # if (P(sim)$.resolution == 125L) {
-    #   LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1JouBj0iJOPB1qQeXkRRePMN6MZSX_R_q",
-    #                         destinationPath = dPath, filename2 = "lcc_fri_rof_125m.tif",
-    #                         fun = "raster::raster", method = "ngb",
-    #                         rasterToMatch = sim$rasterToMatchLarge)
-    # } else if (P(sim)$.resolution == 250L) {
-    #   LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1-2XSrSp_WrZCnqUhHTaj0rQpzOcSLrfS",
-    #                         destinationPath = dPath, filename2 = "lcc_fri_rof_250m.tif",
-    #                         fun = "raster::raster", method = "ngb",
-    #                         rasterToMatch = sim$rasterToMatchLarge)
-    # }
+    sim$nonForestedLCCGroups <- list(
+      "FenPlus" = c(7, 8, 10, 11, 12, 24), #heath, thicket swamp, deciduous swamp, open fen, treed fen, agriculture
+      #ag/heath/deciduous swamp are present in trivial amounts
+      "BogSwamp" = c(9, 13, 14)) #coniferous swamp, open bog, treed bog. These burn at ~2x the rate of other non-forest classes
   }
-
+  sim$LandRforestedLCC <- LandRforestedLCC
+  sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonTreePixels <- nonTreePixels
-  sim$treeClasses <- treeClassesLCC
+  sim$treeClasses <- sim$LandRforestedLCC #TODO review what this is used for
   sim$nontreeClasses <- nontreeClassesLCC
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
