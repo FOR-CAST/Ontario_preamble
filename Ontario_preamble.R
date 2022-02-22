@@ -50,8 +50,9 @@ defineModule(sim, list(
     createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSEnse."),
     createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("missingLCCgroup", "character", "the group in nonForestLCCGroups that describes forested pixels omitted by LandR"),
     createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be nonflammable"),
-    createsOutput("nonForestedLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
+    createsOutput("nonForestLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
     createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), #TODO what is this used for?
     createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), #TODO: what is this used for?
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
@@ -336,9 +337,10 @@ Init <- function(sim) {
     sim$nonForestClasses <- nontreeClassesLCC
 
     stop("figure out what nonForestedLCCGroups is with LCC2005...")
-    sim$nonForestedLCCGroups <- list(
+    sim$nonForestLCCGroups <- list(
       "nonForest_highFlam" = c(8, 10, 14),#shrubland, grassland, wetland
       "nonForest_lowFlam" = c(11, 12, 15))
+    sim$missingLCCGroup <- "nonForest_highFlam"
 
 
   } else if (grepl("ROF", studyAreaName)) {
@@ -436,10 +438,11 @@ Init <- function(sim) {
     treePixelsLCC <- which(sim$LCC[] %in% LandRforestedLCC)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
-    sim$nonForestedLCCGroups <- list(
+    sim$nonForestLCCGroups <- list(
       "FenPlus" = c(7, 8, 10, 11, 12, 24), #heath, thicket swamp, deciduous swamp, open fen, treed fen, agriculture
       #ag/heath/deciduous swamp are present in trivial amounts
       "BogSwamp" = c(9, 13, 14)) #coniferous swamp, open bog, treed bog. These burn at ~2x the rate of other non-forest classes
+    sim$missingLCCGroup <- "BogSwamp"
   }
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
