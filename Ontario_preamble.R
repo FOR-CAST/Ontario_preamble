@@ -349,17 +349,19 @@ Init <- function(sim) {
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
     ##
-    LCC_FN <- prepInputsFarNorthLCC(dPath = dPath)
+    LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = dPath)
     LCC_FN[LCC_FN[] <= 0] <- NA_integer_ ## remove 0, -9, and -99
     LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
     LCC_FN <- Cache(postProcess, LCC_FN, method = "ngb", rasterToMatch = sim$rasterToMatchLarge)
 
-    ## LandR forest classes are distinct from fireSense forest classes, in that
-    ## fireSense assesses forest by the dominant species composition (i.e. fuel class) and not the landcover.
+    ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
+    ## forest by the dominant species composition (i.e. fuel class) and not the landcover.
     ## however, fire may be strongly influenced by landcover (e.g., wetland) therefore
     ## fireSense forest classes are restricted to upland forest classes, unlike LandR
-    ## Here we reclassify disturbed to it's nearest valid (i.e. flammable) class using an expanding focal window
-    ## If no suitable pixel is found in the neighbouring 3-pixel locus, coniferous forest class is assigned by default
+    ## Here we reclassify disturbed to it's nearest valid (i.e. flammable) class using an expanding
+    ## focal window.
+    ## If no suitable pixel is found in the neighbouring 3-pixel locus, coniferous forest class is
+    ## assigned by default.
     ## this would mean the pixel is at the center of a (7*125m^2) = 75 ha patch)
 
     ## Far North cover classes described in `Far North Land Cover - Data Specification.pdf`
