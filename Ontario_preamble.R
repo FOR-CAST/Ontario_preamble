@@ -3,7 +3,7 @@ defineModule(sim, list(
   description = paste("this module prepares 2 sets of objects needed for LandR simulations in Ontario AOU/ROF:",
                       "1. study areas and corresponding rasterToMatch (as well as large versions);",
                       "2. species equivalencies tables and the sppEquiv column.",
-                      "Each is customized to the study area parameter passed as studyAreaName."),
+                      "Each is customized to the study area parameter passed via runName."),
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca"),
@@ -72,7 +72,6 @@ defineModule(sim, list(
                         "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
                         "Alberta, and Boreal British Columbia")),
     createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing.")
-
   )
 ))
 
@@ -84,7 +83,22 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
     eventType,
     init = {
       # do stuff for this event
-      sim <- Init(sim)
+      mod$studyAreaName <- if (grepl("AOU", P(sim)$runName)) {
+        "AOU"
+      } else if (grepl("ROF", P(sim)$runName)) {
+        if (grepl("boreal|shield", P(sim)$runName)) {
+          "ROF_shield"
+        } else if (grepl("plain", P(sim)$runName)) {
+          "ROF_plain"
+        }
+      } else {
+        stop("runName must contain one of 'AOU' or 'ROF'.")
+      }
+
+      sim <- InitSpecies(sim)
+      sim <- InitStudyAreaRTM(sim)
+      sim <- InitStudyAreaLCC(sim)
+      sim <- InitAge(sim)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
@@ -104,10 +118,6 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       Plot(sim$ageMap2011)
 
       Plot(sim$LCC)
-
-      # schedule future event(s)
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "Ontario_preamble", "plot")
-
       # ! ----- STOP EDITING ----- ! #
     },
     save = {
@@ -130,23 +140,29 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
   return(invisible(sim))
 }
 
-Init <- function(sim) {
+InitSpecies <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$runName, currentModule(sim))
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
-  studyAreaName <- if (grepl("AOU", runName)) {
-    "AOU"
-  } else if (grepl("ROF", runName)) {
-    if (grepl("boreal|shield", runName)) {
-      "ROF_shield"
-    } else if (grepl("plain", runName)) {
-      "ROF_plain"
-    }
-  } else {
-    stop("runName must contain one of 'AOU' or 'ROF'.")
-  }
+  ## SPECIES STUFF
+  sim$sppEquiv <- makeSppEquivON()
+  sim$sppEquivCol <- "ON"
+
+  sim$sppColorVect <- sppColors(sim$sppEquiv, sim$sppEquivCol, newVals = "Mixed", palette = "Accent")
+
+  sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
+
+  # ! ----- STOP EDITING ----- ! #
+  return(invisible(sim))
+}
+
+InitStudyAreaRTM <- function(sim) {
+  # # ! ----- EDIT BELOW ----- ! #
+  cacheTags <- c(P(sim)$runName, currentModule(sim))
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
@@ -158,7 +174,7 @@ Init <- function(sim) {
     st_transform(., crs = sim$targetCRS)
 
   ## ECOZONES
-  ez <- switch(studyAreaName,
+  ez <- switch(mod$studyAreaName,
                ROF_shield = "BOREAL SHIELD",
                ROF_plain = "HUDSON PLAIN",
                NULL)
@@ -176,7 +192,7 @@ Init <- function(sim) {
   rm(ecozones)
 
   ## STUDY AREA
-  if (studyAreaName == "AOU") {
+  if (mod$studyAreaName == "AOU") {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
       destinationPath = dPath,
@@ -202,7 +218,7 @@ Init <- function(sim) {
       team_drive = TRUE
     ) %>%
       as_Spatial(.)
-  } else if (grepl("ROF", studyAreaName)) {
+  } else if (grepl("ROF", mod$studyAreaName)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetCRS = sim$targetCRS, ## TODO: fails on Windows
@@ -215,7 +231,7 @@ Init <- function(sim) {
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
-    studyAreaLarge <- studyArea
+    studyAreaLarge <- studyArea ## TODO: tmeprory workaround downstream raster mismatches
     # studyAreaLarge <- prepInputs(
     #   url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
     #   targetCRS = sim$targetCRS, ## TODO: fails on Windows
@@ -228,7 +244,7 @@ Init <- function(sim) {
   }
 
   ## define test study area
-  if (grepl("test", runName)) {
+  if (grepl("test", P(sim)$runName)) {
     studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e10, seed = NULL)
     studyAreaLarge <- buffer(studyArea, 10000)
     shapefile(sim$studyArea, file.path(outputPath(sim), "studyArea_AOU_test.shp"), overwrite = TRUE)
@@ -244,37 +260,38 @@ Init <- function(sim) {
                              studyArea = sim$studyArea,
                              destinationPath = dPath,
                              useCache = P(sim)$.useCache,
-                             filename2 = paste0(studyAreaName, "_rtm.tif"))
+                             filename2 = paste0(mod$studyAreaName, "_rtm.tif"))
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005, ## TODO: use 2010
                                   studyArea = sim$studyAreaLarge,
                                   destinationPath = dPath,
                                   useCache = P(sim)$.useCache,
-                                  filename2 = paste0(studyAreaName, "_rtml.tif"))
+                                  filename2 = paste0(mod$studyAreaName, "_rtml.tif"))
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005, ## TODO: use 2010
                                       studyArea = sim$studyAreaReporting,
                                       destinationPath = dPath,
                                       useCache = P(sim)$.useCache,
-                                      filename2 = paste0(studyAreaName, "_rtmr.tif"))
+                                      filename2 = paste0(mod$studyAreaName, "_rtmr.tif"))
 
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- raster::disaggregate(sim$rasterToMatch, fact = 2)
     sim$rasterToMatchLarge <- raster::disaggregate(sim$rasterToMatchLarge, fact = 2)
     sim$rasterToMatchReporting <- raster::disaggregate(sim$rasterToMatchReporting, fact = 2)
   }
+  # ! ----- STOP EDITING ----- ! #
+  return(invisible(sim))
+}
 
-  ## SPECIES STUFF
-  sim$sppEquiv <- makeSppEquivON()
-  sim$sppEquivCol <- "ON"
-
-  sim$sppColorVect <- sppColors(sppEquivalencies_CA, sim$sppEquivCol, newVals = "Mixed", palette = "Accent")
-
-  sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
+InitStudyAreaLCC <- function(sim) {
+  # # ! ----- EDIT BELOW ----- ! #
+  cacheTags <- c(P(sim)$runName, currentModule(sim))
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## LANDCOVER MAPS (LCC2005 + FRI if AOU; Far North if ROF)
-  if (studyAreaName == "AOU") {
+  if (mod$studyAreaName == "AOU") {
     LCC2005 <- prepInputsLCC(year = 2005, studyArea = sim$studyAreaLarge, destinationPath = dPath) ## TODO: use LCC2010
     if (P(sim)$.resolution == 125L) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
@@ -343,7 +360,7 @@ Init <- function(sim) {
       nonForest_lowFlam = c(21, 23:24, 26:29, 31)
     )
     sim$missingLCCGroup <- "nonForest_highFlam"
-  } else if (grepl("ROF", studyAreaName)) {
+  } else if (grepl("ROF", mod$studyAreaName)) {
 
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
@@ -374,7 +391,7 @@ Init <- function(sim) {
     # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
 
-    nIterations <- ifelse(grepl("ROF_shield", studyAreaName), 3, 3) ## TODO: revisit this
+    nIterations <- ifelse(grepl("ROF_shield", mod$studyAreaName), 3, 3) ## TODO: revisit this
     LCC_FN <- LandR::convertUnwantedLCC2(classesToReplace = 19:20, rstLCC = LCC_FN,
                                          nIterations = nIterations, defaultNewValue = 18,
                                          invalidClasses = c(1:5, 21:24))
@@ -412,12 +429,27 @@ Init <- function(sim) {
   sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
-  allClasses <- if (grepl("ROF", studyAreaName)) {
-    1:24
+  allClasses <- if (grepl("ROF", mod$studyAreaName)) {
+    c(1:18, 21:24) ## classes 19 and 20 reclassified
   } else {
-    1:39
+    1:39 ## TODO: confirm no classes removed
   }
-  stopifnot(all(allClasses %in% c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
+  fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
+  if (!all(allClasses %in% fS_classes)) {
+    stop("Some LCCs not accounted for:\n",
+         "Expected: ", allClasses, "\n",
+         "Assigned to fireSense classes: ", fS_classes)
+  }
+
+  # ! ----- STOP EDITING ----- ! #
+  return(invisible(sim))
+}
+
+InitAge <- function(sim) {
+  # # ! ----- EDIT BELOW ----- ! #
+  cacheTags <- c(P(sim)$runName, currentModule(sim))
+  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   if (isTRUE(P(sim)$useAgeMapkNN)) {
@@ -445,8 +477,8 @@ Init <- function(sim) {
       destinationPath = dPath,
       startTime = 2001,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
-      userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", mod$studyAreaName)),
+      userTags = c("stable", currentModule(sim), mod$studyAreaName)
     )
 
     standAgeMap2011 <- Cache(
@@ -460,8 +492,8 @@ Init <- function(sim) {
       destinationPath = dPath,
       startTime = 2011,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
-      userTags = c("stable", currentModule(sim), P(sim)$studyAreaname)
+      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", mod$studyAreaName)),
+      userTags = c("stable", currentModule(sim), mod$studyAreaName)
     )
 
     ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
@@ -483,30 +515,30 @@ Init <- function(sim) {
     ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
     if (FALSE) {
       ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
-      if (studyAreaName == "AOU") {
+      if (mod$studyAreaName == "AOU") {
         standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
                                      destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
-                                     userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+                                     userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "",
                                     destinationPath = dPath, filename2 = "",
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
-                                    userTags = c("refYearMapFRI", studyAreaName, currentModule(sim)))
-      } else if (studyAreaName == "ROF") {
+                                    userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
+      } else if (mod$studyAreaName == "ROF") {
         # if (P(sim)$.resolution == 125L) {
         #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
         #                                destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
         #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
         #                                rasterToMatch = sim$rasterToMatchLarge,
-        #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+        #                                userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
         # } else if (P(sim)$.resolution == 250L) {
         #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
         #                                destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
         #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
         #                                rasterToMatch = sim$rasterToMatchLarge,
-        #                                userTags = c("standAgeMapFRI", studyAreaName, currentModule(sim)))
+        #                                userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
         # }
       }
       standAgeMapFRI <- setMinMax(standAgeMapFRI)
