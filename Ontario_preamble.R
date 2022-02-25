@@ -361,7 +361,6 @@ InitStudyAreaLCC <- function(sim) {
     )
     sim$missingLCCGroup <- "nonForest_highFlam"
   } else if (grepl("ROF", mod$studyAreaName)) {
-
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
