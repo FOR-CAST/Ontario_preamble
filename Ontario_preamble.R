@@ -391,10 +391,14 @@ InitStudyAreaLCC <- function(sim) {
     # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
 
-    nIterations <- ifelse(grepl("ROF_shield", mod$studyAreaName), 3, 3) ## TODO: revisit this
-    LCC_FN <- LandR::convertUnwantedLCC2(classesToReplace = 19:20, rstLCC = LCC_FN,
-                                         nIterations = nIterations, defaultNewValue = 18,
-                                         invalidClasses = c(1:5, 21:24))
+    nIterations <- ifelse(grepl("ROF_shield", studyAreaName), 3, 3) ## TODO: revisit this
+    LCC_FN <- Cache(LandR::convertUnwantedLCC2,
+                    classesToReplace = 19:20,
+                    rstLCC = LCC_FN,
+                    nIterations = nIterations,
+                    defaultNewValue = 18,
+                    invalidClasses = c(1:5, 21:24),
+                    userTags = c("convertUnwantedLCC2", studyAreaName))
 
     sim$LCC <- LCC_FN
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
