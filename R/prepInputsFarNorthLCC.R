@@ -55,6 +55,6 @@ prepInputsFarNorthLCC <- function(dPath) {
   r16 <- raster(f[2]) %>% projectRaster(., t16, method = "ngb", datatype = "INT2U")
   r17 <- raster(f[3]) %>% projectRaster(., t17, method = "ngb", datatype = "INT2U")
 
-  LCC_FN <- raster::mosaic(r15, r16, r17, fun = min)
+  LCC_FN <- raster::mosaic(r15, r16, r17, fun = min, filename = file.path(dPath, "FarNorth_LandCover_Class_UTM17_mosaic.tif"))
   return(LCC_FN)
 }

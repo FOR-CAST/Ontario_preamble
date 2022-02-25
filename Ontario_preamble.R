@@ -368,7 +368,13 @@ InitStudyAreaLCC <- function(sim) {
     LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = dPath)
     LCC_FN[LCC_FN[] <= 0] <- NA_integer_ ## remove 0, -9, and -99
     LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
-    LCC_FN <- Cache(postProcess, LCC_FN, method = "ngb", rasterToMatch = sim$rasterToMatchLarge)
+    LCC_FN <- Cache(
+      postProcess,
+      LCC_FN,
+      method = "ngb",
+      rasterToMatch = sim$rasterToMatchLarge,
+      filename2 = file.path("FarNorth_LandCover_Class_", mod$studyAreaName, ".tif)
+    )
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
     ## forest by the dominant species composition (i.e. fuel class) and not the landcover.
