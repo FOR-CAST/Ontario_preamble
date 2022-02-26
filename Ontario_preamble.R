@@ -373,7 +373,7 @@ InitStudyAreaLCC <- function(sim) {
       LCC_FN,
       method = "ngb",
       rasterToMatch = sim$rasterToMatchLarge,
-      filename2 = file.path("FarNorth_LandCover_Class_", mod$studyAreaName, ".tif)
+      filename2 = file.path("FarNorth_LandCover_Class_", mod$studyAreaName, ".tif")
     )
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
