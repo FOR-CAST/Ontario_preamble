@@ -47,7 +47,7 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
-    createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSEnse."),
+    createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "RasterLayer", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
