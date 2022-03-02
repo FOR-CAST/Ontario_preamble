@@ -578,13 +578,29 @@ InitAge <- function(sim) {
       destinationPath = dPath,
       rasterToMatch = sim$rasterToMatchLarge
     )
+    modageMap <- asInteger(modageMap)
     imputedPixID <- which(!is.na(modageMap[])) ## all pixels imputed
 
-    ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001?
-    standAgeMap2001 <- modageMap - 14L
+    ## TODO: it doesn't look like Raquel's layer properly accounts for wildfire raster,
+    ## so we will manually adjust it here. But the age map needs to be fixed in ROF_age and rebuilt.
+    wildfires <- Cache(
+      prepInputs,
+      url = "https://drive.google.com/file/d/1WcxdP-wyHBCnBO7xYGZ0qKgmvqvOzmxp/",
+      targetFile = "wildfire_ROF.tif",
+      destinationPath = dPath,
+      rasterToMatch = sim$rasterToMatch
+    )
+    wildfires <- wildfires2001 <- wildfires2011 <- asInteger(wildfires)
+    wildfires2001[wildfires[] > 2001] <- NA
+    wildfires2011[wildfires[] > 2011] <- NA
+    tsf2001 <- 2001L - wildfires2001
+    tsf2011 <- 2011L - wildfires2011
+
+    ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001.
+    standAgeMap2001 <- modageMap - 14L - tsf2001
     attr(standAgeMap2001, "imputedPixID") <- imputedPixID
 
-    standAgeMap2011 <- modageMap - 4L
+    standAgeMap2011 <- modageMap - 4L - tsf2011
     attr(standAgeMap2011, "imputedPixID") <- imputedPixID
   }
 
