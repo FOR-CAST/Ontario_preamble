@@ -35,8 +35,8 @@ defineModule(sim, list(
                     "raster pixel size, in m,  to use for simulation. Either 250 or 125."),
     defineParameter("runName", "character", "AOU", NA, NA,
                     paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
-                          "(if 'ROF', then 'shield' or 'plain' should be specified too,",
-                          "to identify whether to run in the Boreal Shield or Hudson Plains ecozone);",
+                          "(if 'ROF', then 'shield' or 'plain' can be specified too,",
+                          "to identify whether to run only in the Boreal Shield or Hudson Plains ecozone);",
                           "as well as 'CanESM5_SSP370' or 'CNRM-ESM2-1_SSP370' (or SSP585) to identify the climate scenario to use.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
                     paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
@@ -90,9 +90,11 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
           "ROF_shield"
         } else if (grepl("plain", P(sim)$runName)) {
           "ROF_plain"
+        } else {
+          "ROF"
         }
       } else {
-        stop("runName must contain one of 'AOU' or 'ROF'.")
+        stop("runName must contain one of 'AOU' or 'ROF' (or 'ROF_shield' or 'ROF_plain').")
       }
 
       sim <- InitSpecies(sim)
@@ -175,9 +177,10 @@ InitStudyAreaRTM <- function(sim) {
 
   ## ECOZONES
   ez <- switch(mod$studyAreaName,
+               ROF = c("BOREAL SHIELD", "HUDSON PLAIN"),
                ROF_shield = "BOREAL SHIELD",
                ROF_plain = "HUDSON PLAIN",
-               NULL)
+               NULL) ## TODO: ensure this works with AOU
 
   ecozones <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
@@ -188,7 +191,7 @@ InitStudyAreaRTM <- function(sim) {
     targetCRS = sim$targetCRS
   )
   ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
-  ecozone <- ecozones[ecozones$ZONE_NAME == ez, ]
+  ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ] ## TODO: ensure this works with AOU
   rm(ecozones)
 
   ## STUDY AREA
