@@ -1,5 +1,5 @@
 makeSppEquivON <- function() {
-  data("sppEquivalencies_CA", package = "LandR")
+  data("sppEquivalencies_CA", package = "LandR", envir = environment())
   sppEquivalencies_CA[grep("Pin", LandR), `:=`(EN_generic_short = "Pine",
                                                EN_generic_full = "Pine",
                                                Leading = "Pine leading")]
