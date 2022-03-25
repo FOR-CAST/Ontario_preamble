@@ -483,7 +483,7 @@ InitAge <- function(sim) {
 
     standAgeMap2001 <- Cache(
       LandR::prepInputsStandAgeMap,
-      ageUrl = standAgeMapURL,
+      ageURL = standAgeMapURL,
       rasterToMatch = sim$rasterToMatchLarge,
       studyArea = sim$studyAreaLarge,
       destinationPath = dPath,
