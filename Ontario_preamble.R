@@ -15,14 +15,24 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list("archive", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
-                  "PredictiveEcology/reproducible@terraInProjectInputs (>= 1.2.8.9033)",
+  reqdPkgs = list("archive", "geodata", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
+                  "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
                   "PredictiveEcology/LandR@development (>= 1.0.7.9004)"),
   parameters = rbind(
+    defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
+                    paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
+                          "May also include the ecoprovince ID in which to run the model.",
+                          "Optionally, if 'ROF', then 'shield' or 'plain' can be specified too,",
+                          "to identify whether to run only in the Boreal Shield or Hudson Plains ecozone.")),
+    defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
+                    paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
+                          "if FALSE, use Raquel's predicted age map from ROF_age.")),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first plot event should occur."),
     defineParameter(".plotInterval", "numeric", NA, NA, NA,
                     "Describes the simulation time interval between plot events."),
+    defineParameter(".resolution", "numeric", 250, NA, NA,
+                    "raster pixel size, in m,  to use for simulation. Either 250 or 125."),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first save event should occur."),
     defineParameter(".saveInterval", "numeric", NA, NA, NA,
@@ -30,26 +40,15 @@ defineModule(sim, list(
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
-                          "and time are not relevant")),
-    defineParameter(".resolution", "numeric", 250, NA, NA,
-                    "raster pixel size, in m,  to use for simulation. Either 250 or 125."),
-    defineParameter("runName", "character", "AOU", NA, NA,
-                    paste("Should include one of 'AOU' or 'ROF' to identify the studyArea",
-                          "(if 'ROF', then 'shield' or 'plain' can be specified too,",
-                          "to identify whether to run only in the Boreal Shield or Hudson Plains ecozone);",
-                          "as well as 'CanESM5_SSP370' or 'CNRM-ESM2-1_SSP370' (or SSP585) to identify the climate scenario to use.")),
-    defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
-                    paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
-                          "if FALSE, use Raquel's predicted age map from ROF_age."))
+                          "and time are not relevant"))
   ),
   inputObjects = bindrows(
     expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
   ),
   outputObjects = bindrows(
     createsOutput("ageMap", "RasterLayer", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
-    createsOutput("fireSenseForestLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
+    createsOutput("fireSenseForestedLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "RasterLayer", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
-    createsOutput("LandRforestLCC", "integer", desc = "vector of LCC classes considered to be forested by LandR."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("missingLCCgroup", "character", "the group in nonForestLCCGroups that describes forested pixels omitted by LandR"),
     createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be nonflammable"),
@@ -70,7 +69,7 @@ defineModule(sim, list(
     createsOutput("studyAreaPSP", "SpatialPolygonsDataFrame",
                   paste("this area will be used to subset PSP plots before building the statistical model.",
                         "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
-                        "Alberta, and Boreal British Columbia")),
+                        "Alberta, Boreal British Columbia, and Ontario")),
     createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing.")
   )
 ))
@@ -83,19 +82,15 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
     eventType,
     init = {
       # do stuff for this event
-      mod$studyAreaName <- if (grepl("AOU", P(sim)$runName)) {
-        "AOU"
-      } else if (grepl("ROF", P(sim)$runName)) {
-        if (grepl("boreal|shield", P(sim)$runName)) {
-          "ROF_shield"
-        } else if (grepl("plain", P(sim)$runName)) {
-          "ROF_plain"
-        } else {
-          "ROF"
-        }
-      } else {
-        stop("runName must contain one of 'AOU' or 'ROF' (or 'ROF_shield' or 'ROF_plain').")
+      fullStudyAreaName <- P(sim)$studyAreaName
+      if (isFALSE(grepl("^ON_", fullStudyAreaName))) {
+        fullStudyAreaName <- paste0("ON_", fullStudyAreaName)
       }
+      mod$studyAreaName <- gsub("^ON_(AOU|ROF_plain|ROF_shield|ROF).*", "\\1", fullStudyAreaName)
+
+      chunks <- strsplit(fullStudyAreaName, "_")[[1]]
+      mod$ecoprov <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
+      mod$ecoprov <- if (length(mod$ecoprov) > 0) mod$ecoprov else NULL
 
       sim <- InitSpecies(sim)
       sim <- InitStudyAreaRTM(sim)
@@ -104,7 +99,6 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "Ontario_preamble", "save", .last())
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
@@ -120,20 +114,6 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       Plot(sim$ageMap2011)
 
       Plot(sim$LCC)
-      # ! ----- STOP EDITING ----- ! #
-    },
-    save = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "Ontario_preamble", "save")
-
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -169,30 +149,47 @@ InitStudyAreaRTM <- function(sim) {
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
   ## provincial boundary
-  canProvs <- raster::getData("GADM", path = dPath, country = "CAN", level = 1, type = "sf")
-  st_crs(canProvs) <- st_crs(canProvs) ## fix "old-style crs" warning from sf
+  canProvs <- geodata::gadm(country = "CAN", level = 1, path = dPath) %>%
+    sf::st_as_sf(.) %>%
+    sf::st_transform(., sim$targetCRS)
 
   mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
     st_transform(., crs = sim$targetCRS)
+
+  ## ECOPROVINCES
+  ecoprovs <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/province/ecoprovince_shp.zip",
+    targetFile = "ecoprovinces.shp",
+    alsoExtract = "similar",
+    fun = "sf::st_read",
+    destinationPath = dPath,
+    targetCRS = sim$targetCRS
+  )
+  ecoprov <- ecoprovs[ecoprovs$ECOPROVINC %in% mod$ecoprov, ]
+  rm(ecoprovs)
 
   ## ECOZONES
   ez <- switch(mod$studyAreaName,
                ROF = c("BOREAL SHIELD", "HUDSON PLAIN"),
                ROF_shield = "BOREAL SHIELD",
                ROF_plain = "HUDSON PLAIN",
-               NULL) ## TODO: ensure this works with AOU
+               NULL)
 
-  ecozones <- prepInputs(
-    url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
-    targetFile = "ecozones.shp",
-    alsoExtract = "similar",
-    fun = "sf::st_read",
-    destinationPath = dPath,
-    targetCRS = sim$targetCRS
-  )
-  ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
-  ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ] ## TODO: ensure this works with AOU
-  rm(ecozones)
+  if (!is.null(ez)) {
+    ecozones <- prepInputs(
+      url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
+      targetFile = "ecozones.shp",
+      alsoExtract = "similar",
+      fun = "sf::st_read",
+      destinationPath = dPath,
+      targetCRS = sim$targetCRS
+    )
+    ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
+    ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ]
+    rm(ecozones)
+  } else {
+    ecozone <- NULL
+  }
 
   ## STUDY AREA
   if (mod$studyAreaName == "AOU") {
@@ -205,8 +202,11 @@ InitStudyAreaRTM <- function(sim) {
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    ) %>%
-      as_Spatial(.)
+    )
+    if (!is.null(ecoprov)) {
+      studyAreaReporting <- st_intersection(studyAreaReporting, ecoprov)
+    }
+    studyAreaReporting <- as_Spatial(studyAreaReporting)
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
@@ -219,8 +219,11 @@ InitStudyAreaRTM <- function(sim) {
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    ) %>%
-      as_Spatial(.)
+    )
+    if (!is.null(ecoprov)) {
+      studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov)
+    }
+    studyAreaLarge <- as_Spatial(studyAreaLarge)
   } else if (grepl("ROF", mod$studyAreaName)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
@@ -246,13 +249,6 @@ InitStudyAreaRTM <- function(sim) {
     #   as_Spatial(.)
   }
 
-  ## define test study area
-  if (grepl("test", P(sim)$runName)) {
-    studyArea <- randomStudyArea(rgeos::gCentroid(studyArea), size = 1e10, seed = NULL)
-    studyAreaLarge <- buffer(studyArea, 10000)
-    shapefile(sim$studyArea, file.path(outputPath(sim), "studyArea_AOU_test.shp"), overwrite = TRUE)
-  }
-
   sim$studyArea <- studyArea
   sim$studyAreaLarge <- studyAreaLarge
   sim$studyAreaReporting <- studyAreaReporting
@@ -263,26 +259,35 @@ InitStudyAreaRTM <- function(sim) {
                              studyArea = sim$studyArea,
                              destinationPath = dPath,
                              useCache = P(sim)$.useCache,
-                             filename2 = paste0(mod$studyAreaName, "_rtm.tif"))
+                             filename2 = NULL)
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005, ## TODO: use 2010
                                   studyArea = sim$studyAreaLarge,
                                   destinationPath = dPath,
                                   useCache = P(sim)$.useCache,
-                                  filename2 = paste0(mod$studyAreaName, "_rtml.tif"))
+                                  filename2 = NULL)
+
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005, ## TODO: use 2010
                                       studyArea = sim$studyAreaReporting,
                                       destinationPath = dPath,
                                       useCache = P(sim)$.useCache,
-                                      filename2 = paste0(mod$studyAreaName, "_rtmr.tif"))
+                                      filename2 = NULL)
 
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- raster::disaggregate(sim$rasterToMatch, fact = 2)
     sim$rasterToMatchLarge <- raster::disaggregate(sim$rasterToMatchLarge, fact = 2)
     sim$rasterToMatchReporting <- raster::disaggregate(sim$rasterToMatchReporting, fact = 2)
   }
+
+  writeRaster(sim$rasterToMatch, file.path(dPath, paste0(mod$studyAreaName, "_rtm.tif")),
+              datatype = "INT1U", overwrite = TRUE)
+  writeRaster(sim$rasterToMatchLarge,  file.path(dPath, paste0(mod$studyAreaName, "_rtml.tif")),
+              datatype = "INT1U", overwrite = TRUE)
+  writeRaster(sim$rasterToMatchReporting,  file.path(dPath, paste0(mod$studyAreaName, "_rtmr.tif")),
+              datatype = "INT1U", overwrite = TRUE)
+
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
@@ -353,10 +358,9 @@ InitStudyAreaLCC <- function(sim) {
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
-    LandRforestClasses <- treeClassesLCC
+    fireSenseForestedLCC <- LandRforestedLCC <- treeClassesLCC
     sim$nonForestClasses <- nontreeClassesLCC
 
-    fireSenseForestedLCC <- treeClassesLCC
     nonflammableLCC  <- c(0, 25, 30, 33, 36:39)
     nonForestLCCGroups <- list(
       nonForest_highFlam = c(16:19, 22),
