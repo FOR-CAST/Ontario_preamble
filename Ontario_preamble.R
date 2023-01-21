@@ -524,49 +524,59 @@ InitAge <- function(sim) {
     imputedPixID2011 <- which(toChange2011)
     attr(standAgeMap2011, "imputedPixID") <- unique(attr(standAgeMap2011, "imputedPixID"), imputedPixID2011)
 
-    ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
-    if (FALSE) {
-      ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
-      if (mod$studyAreaName == "AOU") {
-        standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
-                                     destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
+    ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
+    if (mod$studyAreaName == "AOU") {
+      standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
+                                   destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
+                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                   rasterToMatch = sim$rasterToMatchLarge,
+                                   userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
+      refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
+                                  destinationPath = dPath, filename2 = "reference_year_fri_ceon_250m.tif",
+                                  fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                  rasterToMatch = sim$rasterToMatchLarge,
+                                  userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
+    } else if (mod$studyAreaName == "ROF") {
+      ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
+
+      if (P(sim)$.resolution == 125L) {
+        standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
+                                     destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
                                      userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
-        refYearMapFRI <- prepInputs(url = "",
-                                    destinationPath = dPath, filename2 = "",
+        refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
+                                    destinationPath = dPath, filename2 = "reference_year_fri_rof_125m.tif",
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
                                     userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
-      } else if (mod$studyAreaName == "ROF") {
-        # if (P(sim)$.resolution == 125L) {
-        #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
-        #                                destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
-        #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-        #                                rasterToMatch = sim$rasterToMatchLarge,
-        #                                userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
-        # } else if (P(sim)$.resolution == 250L) {
-        #   standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
-        #                                destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
-        #                                fun = "raster::raster", method = "bilinear", datatype = "INT2U",
-        #                                rasterToMatch = sim$rasterToMatchLarge,
-        #                                userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
-        # }
+      } else if (P(sim)$.resolution == 250L) {
+        standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
+                                     destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
+                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                     rasterToMatch = sim$rasterToMatchLarge,
+                                     userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
+        refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
+                                    destinationPath = dPath, filename2 = "reference_year_fri_rof_250m.tif",
+                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                    rasterToMatch = sim$rasterToMatchLarge,
+                                    userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
       }
       standAgeMapFRI <- setMinMax(standAgeMapFRI)
-      standAgeMapFRI[standAgeMapFRI < 0] <- 0L
+      standAgeMapFRI[standAgeMapFRI[] < 0] <- 0L
 
-      # TODO:
       #   1. adjust each age by reference year, for 2001 and 2011 to get age in 2001 and 2011
-      #   2. any values < 0, set as NA. we will fall back to kNN values for these
+      standAgeMapFRI2001 <- standAgeMapFRI - (refYearMapFRI - 2001L)
+      standAgeMapFRI2011 <- standAgeMapFRI - (refYearMapFRI - 2011L)
 
-      ## 2001 age map
-      standAgeMap2001[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-      standAgeMap2001[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+      #   2. any values < 0, fall back to kNN values for these
+      noDataPixelsFRI2001 <- which(standAgeMapFRI2001[] < 0)
+      standAgeMapFRI2001[noDataPixelsFRI2001] <- standAgeMap2001[noDataPixelsFRI2001]
+      standAgeMap2001 <- standAgeMapFRI2001
 
-      ## 2011 age map
-      standAgeMap2011[noDataPixelsFRI] <- standAgeMapFRI[noDataPixelsFRI]
-      standAgeMap2011[sim$nonTreePixels] <- NA ## TODO: i think we need ages on non-treed for fS
+      noDataPixelsFRI2011 <- which(standAgeMapFRI2011[] < 0)
+      standAgeMapFRI2011[noDataPixelsFRI2011] <- standAgeMap2011[noDataPixelsFRI2011]
+      standAgeMap2011 <- standAgeMapFRI2011
     }
   } else {
     ## NOTE: this new layer is bad:
