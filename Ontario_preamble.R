@@ -162,9 +162,9 @@ InitStudyAreaRTM <- function(sim) {
     targetFile = "ecoprovinces.shp",
     alsoExtract = "similar",
     fun = "sf::st_read",
-    destinationPath = dPath,
-    targetCRS = sim$targetCRS
-  )
+    destinationPath = dPath
+  ) %>%
+    st_transform(., sim$targetCRS)
   ecoprov <- ecoprovs[ecoprovs$ECOPROVINC %in% mod$ecoprov, ]
   rm(ecoprovs)
 
@@ -181,9 +181,9 @@ InitStudyAreaRTM <- function(sim) {
       targetFile = "ecozones.shp",
       alsoExtract = "similar",
       fun = "sf::st_read",
-      destinationPath = dPath,
-      targetCRS = sim$targetCRS
-    )
+      destinationPath = dPath
+    ) %>%
+      st_transform(., sim$targetCRS)
     ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
     ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ]
     rm(ecozones)
@@ -198,11 +198,11 @@ InitStudyAreaRTM <- function(sim) {
       destinationPath = dPath,
       targetFile = "CEON_def.shp",
       alsoExtract = "similar",
-      targetCRS = sim$targetCRS, ## TODO: fails on Windows
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    )
+    ) %>%
+      st_transform(., sim$targetCRS)
     if (!is.null(ecoprov)) {
       studyAreaReporting <- st_intersection(studyAreaReporting, ecoprov)
     }
@@ -215,11 +215,11 @@ InitStudyAreaRTM <- function(sim) {
       destinationPath = dPath,
       targetFile = "CEON_def_50km_buff.shp",
       alsoExtract = "similar",
-      targetCRS = sim$targetCRS, ## TODO: fails on Windows
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    )
+    ) %>%
+      st_transform(., sim$targetCRS)
     if (!is.null(ecoprov)) {
       studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov)
     }
@@ -227,11 +227,11 @@ InitStudyAreaRTM <- function(sim) {
   } else if (grepl("ROF", mod$studyAreaName)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
-      targetCRS = sim$targetCRS, ## TODO: fails on Windows
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) %>%
+      st_transform(., sim$targetCRS) %>%
       st_intersection(., ecozone) %>%
       as_Spatial(.)
 
