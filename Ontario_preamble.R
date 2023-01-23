@@ -519,14 +519,14 @@ InitAge <- function(sim) {
 
     toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
     standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
-    imputedPixID2001 <- which(toChange2001)
-    attr(standAgeMap2001, "imputedPixID") <- unique(attr(standAgeMap2001, "imputedPixID"), imputedPixID2001)
+    imputedPixID2001 <- unique(attr(standAgeMap2001, "imputedPixID"), which(toChange2001))
+    attr(standAgeMap2001, "imputedPixID") <- imputedPixID2001
 
     minNonDisturbedAge2011 <- 2011L - earliestFireYear
     toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
     standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
-    imputedPixID2011 <- which(toChange2011)
-    attr(standAgeMap2011, "imputedPixID") <- unique(attr(standAgeMap2011, "imputedPixID"), imputedPixID2011)
+    imputedPixID2011 <- unique(attr(standAgeMap2011, "imputedPixID"), which(toChange2011))
+    attr(standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
     ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
     if (mod$studyAreaName == "AOU") {
@@ -577,10 +577,12 @@ InitAge <- function(sim) {
       noDataPixelsFRI2001 <- which(standAgeMapFRI2001[] < 0)
       standAgeMapFRI2001[noDataPixelsFRI2001] <- standAgeMap2001[noDataPixelsFRI2001]
       standAgeMap2001 <- standAgeMapFRI2001
+      attr(standAgeMap2001, "imputedPixID") <- unique(imputedPixID2001, noDataPixelsFRI2001)
 
       noDataPixelsFRI2011 <- which(standAgeMapFRI2011[] < 0)
       standAgeMapFRI2011[noDataPixelsFRI2011] <- standAgeMap2011[noDataPixelsFRI2011]
       standAgeMap2011 <- standAgeMapFRI2011
+      attr(standAgeMap2011, "imputedPixID") <- unique(imputedPixID2011, noDataPixelsFRI2011)
     }
   } else {
     ## NOTE: this new layer is bad:
@@ -622,7 +624,10 @@ InitAge <- function(sim) {
   }
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
+  attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2011
+
   sim$standAgeMap2011 <- asInteger(standAgeMap2011)
+  attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
