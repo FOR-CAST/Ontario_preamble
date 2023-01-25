@@ -310,10 +310,11 @@ InitStudyAreaLCC <- function(sim) {
     nontreeClassesLCC <- sort(uniqueLCCclasses[!uniqueLCCclasses %in% treeClassesLCC])
 
     LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
-                          destinationPath = dPath, filename2 = "lcc_fri_ceon_250m.tif",
+                          destinationPath = dPath,
+                          filename1 = "lcc_fri_ceon_250m.tif",
+                          filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
                           fun = "raster::raster", method = "ngb",
                           rasterToMatch = sim$rasterToMatchLarge)
-
     LCC_FRI <- setMinMax(LCC_FRI)
 
     ###### FRI LANDCOVER CLASSES
@@ -531,12 +532,16 @@ InitAge <- function(sim) {
     ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
     if (mod$studyAreaName == "AOU") {
       standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
-                                   destinationPath = dPath, filename2 = "age_fri_ceon_250m.tif",
+                                   destinationPath = dPath,
+                                   filename1 = "age_fri_ceon_250m.tif",
+                                   filename2 = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                    rasterToMatch = sim$rasterToMatchLarge,
                                    userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
       refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
-                                  destinationPath = dPath, filename2 = "reference_year_fri_ceon_250m.tif",
+                                  destinationPath = dPath,
+                                  filename1 = "reference_year_fri_ceon_250m.tif",
+                                  filename2 = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                   rasterToMatch = sim$rasterToMatchLarge,
                                   userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
@@ -545,23 +550,31 @@ InitAge <- function(sim) {
 
       if (P(sim)$.resolution == 125L) {
         standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
-                                     destinationPath = dPath, filename2 = "age_fri_rof_125m.tif",
+                                     destinationPath = dPath,
+                                     filename1 = "age_fri_rof_125m.tif",
+                                     filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
                                      userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
-                                    destinationPath = dPath, filename2 = "reference_year_fri_rof_125m.tif",
+                                    destinationPath = dPath,
+                                    filename1 = "reference_year_fri_rof_125m.tif",
+                                    filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
                                     userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
       } else if (P(sim)$.resolution == 250L) {
         standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
-                                     destinationPath = dPath, filename2 = "age_fri_rof_250m.tif",
+                                     destinationPath = dPath,
+                                     filename1 = "age_fri_rof_250m.tif",
+                                     filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
                                      userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
-                                    destinationPath = dPath, filename2 = "reference_year_fri_rof_250m.tif",
+                                    destinationPath = dPath,
+                                    filename1 = "reference_year_fri_rof_250m.tif",
+                                    filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
                                     userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
