@@ -86,7 +86,7 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       if (isFALSE(grepl("^ON_", fullStudyAreaName))) {
         fullStudyAreaName <- paste0("ON_", fullStudyAreaName)
       }
-      mod$studyAreaName <- gsub("^ON_(AOU|ROF_plain|ROF_shield|ROF).*", "\\1", fullStudyAreaName)
+      mod$studyAreaNameShort <- gsub("^ON_(AOU|ROF_plain|ROF_shield|ROF).*", "\\1", fullStudyAreaName)
 
       chunks <- strsplit(fullStudyAreaName, "_")[[1]]
       mod$ecoprov <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
@@ -169,7 +169,7 @@ InitStudyAreaRTM <- function(sim) {
   rm(ecoprovs)
 
   ## ECOZONES
-  ez <- switch(mod$studyAreaName,
+  ez <- switch(mod$studyAreaNameShort,
                ROF = c("BOREAL SHIELD", "HUDSON PLAIN"),
                ROF_shield = "BOREAL SHIELD",
                ROF_plain = "HUDSON PLAIN",
@@ -192,7 +192,7 @@ InitStudyAreaRTM <- function(sim) {
   }
 
   ## STUDY AREA
-  if (mod$studyAreaName == "AOU") {
+  if (mod$studyAreaNameShort == "AOU") {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
       destinationPath = dPath,
@@ -224,7 +224,7 @@ InitStudyAreaRTM <- function(sim) {
       studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov)
     }
     studyAreaLarge <- as_Spatial(studyAreaLarge)
-  } else if (grepl("ROF", mod$studyAreaName)) {
+  } else if (grepl("ROF", mod$studyAreaNameShort)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
@@ -281,11 +281,11 @@ InitStudyAreaRTM <- function(sim) {
     sim$rasterToMatchReporting <- raster::disaggregate(sim$rasterToMatchReporting, fact = 2)
   }
 
-  writeRaster(sim$rasterToMatch, file.path(dPath, paste0(mod$studyAreaName, "_rtm.tif")),
+  writeRaster(sim$rasterToMatch, file.path(dPath, paste0(P(sim)$studyAreaName, "_rtm.tif")),
               datatype = "INT1U", overwrite = TRUE)
-  writeRaster(sim$rasterToMatchLarge,  file.path(dPath, paste0(mod$studyAreaName, "_rtml.tif")),
+  writeRaster(sim$rasterToMatchLarge,  file.path(dPath, paste0(P(sim)$studyAreaName, "_rtml.tif")),
               datatype = "INT1U", overwrite = TRUE)
-  writeRaster(sim$rasterToMatchReporting,  file.path(dPath, paste0(mod$studyAreaName, "_rtmr.tif")),
+  writeRaster(sim$rasterToMatchReporting,  file.path(dPath, paste0(P(sim)$studyAreaName, "_rtmr.tif")),
               datatype = "INT1U", overwrite = TRUE)
 
   # ! ----- STOP EDITING ----- ! #
@@ -299,7 +299,7 @@ InitStudyAreaLCC <- function(sim) {
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## LANDCOVER MAPS (LCC2005 + FRI if AOU; Far North if ROF)
-  if (mod$studyAreaName == "AOU") {
+  if (mod$studyAreaNameShort == "AOU") {
     LCC2005 <- prepInputsLCC(year = 2005, studyArea = sim$studyAreaLarge, destinationPath = dPath) ## TODO: use LCC2010
     if (P(sim)$.resolution == 125L) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
@@ -368,7 +368,7 @@ InitStudyAreaLCC <- function(sim) {
       nonForest_lowFlam = c(21, 23:24, 26:29, 31)
     )
     sim$missingLCCGroup <- "nonForest_highFlam"
-  } else if (grepl("ROF", mod$studyAreaName)) {
+  } else if (grepl("ROF", mod$studyAreaNameShort)) {
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
@@ -381,7 +381,7 @@ InitStudyAreaLCC <- function(sim) {
       LCC_FN,
       method = "ngb",
       rasterToMatch = sim$rasterToMatchLarge,
-      filename2 = file.path("FarNorth_LandCover_Class_", mod$studyAreaName, ".tif")
+      filename2 = file.path("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
     )
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
@@ -446,7 +446,7 @@ InitStudyAreaLCC <- function(sim) {
   sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
-  allClasses <- if (grepl("ROF", mod$studyAreaName)) {
+  allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
     c(1:18, 21:24) ## classes 19 and 20 reclassified
   } else {
     1:39 ## TODO: confirm no classes removed
@@ -494,8 +494,8 @@ InitAge <- function(sim) {
       destinationPath = dPath,
       startTime = 2001,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", mod$studyAreaName)),
-      userTags = c("stable", currentModule(sim), mod$studyAreaName)
+      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
+      userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
     )
 
     standAgeMap2011 <- Cache(
@@ -509,8 +509,8 @@ InitAge <- function(sim) {
       destinationPath = dPath,
       startTime = 2011,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", mod$studyAreaName)),
-      userTags = c("stable", currentModule(sim), mod$studyAreaName)
+      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
+      userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
     )
 
     ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
@@ -530,22 +530,22 @@ InitAge <- function(sim) {
     attr(standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
     ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
-    if (mod$studyAreaName == "AOU") {
+    if (mod$studyAreaNameShort == "AOU") {
       standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
                                    destinationPath = dPath,
                                    filename1 = "age_fri_ceon_250m.tif",
                                    filename2 = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                    rasterToMatch = sim$rasterToMatchLarge,
-                                   userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
+                                   userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
                                   destinationPath = dPath,
                                   filename1 = "reference_year_fri_ceon_250m.tif",
                                   filename2 = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                   rasterToMatch = sim$rasterToMatchLarge,
-                                  userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
-    } else if (mod$studyAreaName == "ROF") {
+                                  userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
+    } else if (mod$studyAreaNameShort == "ROF") {
       ## TODO: compare kNN ages (adjusted with fire data) to the LCC_FN classes considered recently disturbed (9:10)
 
       if (P(sim)$.resolution == 125L) {
@@ -555,14 +555,14 @@ InitAge <- function(sim) {
                                      filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
-                                     userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
+                                     userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
                                     destinationPath = dPath,
                                     filename1 = "reference_year_fri_rof_125m.tif",
                                     filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
-                                    userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
+                                    userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       } else if (P(sim)$.resolution == 250L) {
         standAgeMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
                                      destinationPath = dPath,
@@ -570,14 +570,14 @@ InitAge <- function(sim) {
                                      filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
                                      fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
-                                     userTags = c("standAgeMapFRI", mod$studyAreaName, currentModule(sim)))
+                                     userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
                                     destinationPath = dPath,
                                     filename1 = "reference_year_fri_rof_250m.tif",
                                     filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
-                                    userTags = c("refYearMapFRI", mod$studyAreaName, currentModule(sim)))
+                                    userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       }
       standAgeMapFRI <- setMinMax(standAgeMapFRI)
       standAgeMapFRI[standAgeMapFRI[] < 0] <- 0L
