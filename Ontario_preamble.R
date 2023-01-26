@@ -3,7 +3,7 @@ defineModule(sim, list(
   description = paste("this module prepares 2 sets of objects needed for LandR simulations in Ontario AOU/ROF:",
                       "1. study areas and corresponding rasterToMatch (as well as large versions);",
                       "2. species equivalencies tables and the sppEquiv column.",
-                      "Each is customized to the study area parameter passed via runName."),
+                      "Each is customized to the study area parameter passed via `studyAreaName`."),
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca"),
@@ -149,24 +149,21 @@ InitStudyAreaRTM <- function(sim) {
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
   ## provincial boundary
-  canProvs <- geodata::gadm(country = "CAN", level = 1, path = dPath) %>%
+  mod$ON <- geodata::gadm(country = "CAN", level = 1, path = dPath) %>%
     sf::st_as_sf(.) %>%
+    subset(., NAME_1 == "Ontario") %>%
     sf::st_transform(., sim$targetCRS)
 
-  mod$ON <- canProvs[canProvs$NAME_1 == "Ontario", ] %>%
-    st_transform(., crs = sim$targetCRS)
-
   ## ECOPROVINCES
-  ecoprovs <- prepInputs(
+  ecoprov <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/province/ecoprovince_shp.zip",
     targetFile = "ecoprovinces.shp",
     alsoExtract = "similar",
     fun = "sf::st_read",
     destinationPath = dPath
   ) %>%
+    subset(., ECOPROVINC %in% mod$ecoprov) %>%
     st_transform(., sim$targetCRS)
-  ecoprov <- ecoprovs[ecoprovs$ECOPROVINC %in% mod$ecoprov, ]
-  rm(ecoprovs)
 
   ## ECOZONES
   ez <- switch(mod$studyAreaNameShort,
