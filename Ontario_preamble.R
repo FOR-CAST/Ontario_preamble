@@ -17,7 +17,7 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
   reqdPkgs = list("archive", "geodata", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
-                  "PredictiveEcology/LandR@development (>= 1.0.7.9004)"),
+                  "PredictiveEcology/LandR@development (>= 1.1.0.1019)"),
   parameters = rbind(
     defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
@@ -475,12 +475,13 @@ InitAge <- function(sim) {
     standAgeMapFileName <- basename(standAgeMapURL)
 
     fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
+
     fireYear <- Cache(prepInputsFireYear,
                       earliestYear = 1950,
                       url = fireURL,
-                      fun = "sf::st_read",
                       destinationPath = dPath,
                       rasterToMatch = sim$rasterToMatchLarge)
+
     fireYear <- postProcess(fireYear, rasterToMatch = sim$rasterToMatchLarge) ## needed cropping
 
     standAgeMap2001 <- Cache(
@@ -490,6 +491,7 @@ InitAge <- function(sim) {
       studyArea = sim$studyAreaLarge,
       destinationPath = dPath,
       startTime = 2001,
+      fireFun = "terra::vect",
       fireURL = fireURL,
       filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
       userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
@@ -505,6 +507,7 @@ InitAge <- function(sim) {
       studyArea = sim$studyAreaLarge,
       destinationPath = dPath,
       startTime = 2011,
+      fireFun = "terra::vect",
       fireURL = fireURL,
       filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
       userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
