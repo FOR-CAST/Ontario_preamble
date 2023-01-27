@@ -50,14 +50,14 @@ defineModule(sim, list(
     createsOutput("fireSenseForestedLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "RasterLayer", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("LCC", "RasterLayer", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
-    createsOutput("missingLCCgroup", "character", "the group in nonForestLCCGroups that describes forested pixels omitted by LandR"),
-    createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be nonflammable"),
+    createsOutput("missingLCCgroup", "character", "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
+    createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be non-flammable"),
     createsOutput("nonForestLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
-    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), #TODO what is this used for?
-    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), #TODO: what is this used for?
+    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), ## TODO what is this used for?
+    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), ## TODO: what is this used for?
     createsOutput("rasterToMatch", "RasterLayer", desc = "Raster to match, based on study area."),
-    createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on studyAreaLarge."),
-    createsOutput("rasterToMatchReporting", "RasterLayer", desc = "Raster to match based on studyAreaReporting."),
+    createsOutput("rasterToMatchLarge", "RasterLayer", desc = "Raster to match (large) based on `studyAreaLarge.`"),
+    createsOutput("rasterToMatchReporting", "RasterLayer", desc = "Raster to match based on `studyAreaReporting.`"),
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
@@ -302,9 +302,13 @@ InitStudyAreaLCC <- function(sim) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
+    allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
+      c(1:18, 21:24) ## classes 19 and 20 reclassified
+    } else {
+      1:39
+    }
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
-    uniqueLCCclasses <- na.omit(unique(LCC2005[]))
-    nontreeClassesLCC <- sort(uniqueLCCclasses[!uniqueLCCclasses %in% treeClassesLCC])
+    nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
 
     LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
                           destinationPath = dPath,
@@ -352,7 +356,7 @@ InitStudyAreaLCC <- function(sim) {
                      classesToReplace = c(treeClassesToReplace, 99),
                      availableERC_by_Sp = NULL)
 
-    nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
+
     treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
     nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
 
@@ -443,11 +447,6 @@ InitStudyAreaLCC <- function(sim) {
   sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
-  allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
-    c(1:18, 21:24) ## classes 19 and 20 reclassified
-  } else {
-    1:39 ## TODO: confirm no classes removed
-  }
   fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
   if (!all(allClasses %in% fS_classes)) {
     stop("Some LCCs not accounted for:\n",
