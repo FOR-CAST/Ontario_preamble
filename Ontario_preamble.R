@@ -310,6 +310,8 @@ InitStudyAreaLCC <- function(sim) {
     } else {
       1:39
     }
+    uniqueLCCclasses <- na.omit(unique(LCC2005[]))
+    
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
 
