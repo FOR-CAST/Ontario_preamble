@@ -61,7 +61,7 @@ defineModule(sim, list(
     createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
     createsOutput("sppColorVect", "character", desc = "Species colour vector."),
     createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
-    createsOutput("sppEquivCol", objectClass = "character", desc = "name of column to use in sppEquiv"),
+    createsOutput("sppEquivCol", "character", desc = "name of column to use in `sppEquiv`."),
     createsOutput("standAgeMap2001", "RasterLayer", desc = "raster of time since disurbance for year 2001."),
     createsOutput("standAgeMap2011", "RasterLayer", desc = "raster of time since disurbance for year 2011."),
     createsOutput("studyArea", "SpatialPolygons", desc = "Buffered study area in which to run simulations."),
@@ -516,18 +516,16 @@ InitAge <- function(sim) {
     ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
     ## now, adjust pixels which are younger than oldest fires upward
     earliestFireYear <- as.integer(minValue(fireYear))
-    minNonDisturbedAge2001 <- 2001L - earliestFireYear
 
+    minNonDisturbedAge2001 <- 2001L - earliestFireYear
     toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
     standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
     imputedPixID2001 <- unique(attr(standAgeMap2001, "imputedPixID"), which(toChange2001))
-    attr(standAgeMap2001, "imputedPixID") <- imputedPixID2001
 
     minNonDisturbedAge2011 <- 2011L - earliestFireYear
     toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
     standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
     imputedPixID2011 <- unique(attr(standAgeMap2011, "imputedPixID"), which(toChange2011))
-    attr(standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
     ## overlay age from FRI. These are assembled from multiple years, so will adjust ages accordingly.
     if (mod$studyAreaNameShort == "AOU") {
@@ -590,12 +588,12 @@ InitAge <- function(sim) {
       noDataPixelsFRI2001 <- which(standAgeMapFRI2001[] < 0)
       standAgeMapFRI2001[noDataPixelsFRI2001] <- standAgeMap2001[noDataPixelsFRI2001]
       standAgeMap2001 <- standAgeMapFRI2001
-      attr(standAgeMap2001, "imputedPixID") <- unique(imputedPixID2001, noDataPixelsFRI2001)
+      imputedPixID2001 <- unique(imputedPixID2001, noDataPixelsFRI2001)
 
       noDataPixelsFRI2011 <- which(standAgeMapFRI2011[] < 0)
       standAgeMapFRI2011[noDataPixelsFRI2011] <- standAgeMap2011[noDataPixelsFRI2011]
       standAgeMap2011 <- standAgeMapFRI2011
-      attr(standAgeMap2011, "imputedPixID") <- unique(imputedPixID2011, noDataPixelsFRI2011)
+      imputedPixID2011 <- unique(imputedPixID2011, noDataPixelsFRI2011)
     }
   } else {
     ## NOTE: this new layer is bad:
