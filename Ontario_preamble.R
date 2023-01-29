@@ -203,12 +203,18 @@ InitStudyAreaRTM <- function(sim) {
       team_drive = TRUE
     ) %>%
       st_transform(., sim$targetCRS)
-    if (!is.null(ecoprov)) {
-      studyAreaReporting <- st_intersection(studyAreaReporting, ecoprov)
-    }
-    studyAreaReporting <- as_Spatial(studyAreaReporting)
 
-    studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
+    if (is.null(ecoprov)) {
+      studyArea <- st_buffer(studyAreaReporting, 20000) |> as_Spatial()
+      studyAreaReporting <- as_Spatial(studyAreaReporting)
+    } else {
+      studyAreaReporting <- st_intersection(studyAreaReporting, ecoprov)
+      studyArea <- st_buffer(studyAreaReporting, 20000) |>
+        st_union() |>
+        st_convex_hull() |>
+        as_Spatial()
+      studyAreaReporting <- as_Spatial(studyAreaReporting)
+    }
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1ngQshBgoyLjkjuXnloXPg7IUMdLmppkB",
@@ -220,10 +226,17 @@ InitStudyAreaRTM <- function(sim) {
       team_drive = TRUE
     ) %>%
       st_transform(., sim$targetCRS)
-    if (!is.null(ecoprov)) {
-      studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov)
+
+    if (is.null(ecoprov)) {
+      studyAreaLarge <- as_Spatial(studyAreaLarge)
+    } else {
+      studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov) |>
+        st_buffer(50000) |>
+        st_union() |>
+        st_convex_hull() |>
+        nngeo::st_remove_holes() |>
+        as_Spatial()
     }
-    studyAreaLarge <- as_Spatial(studyAreaLarge)
   } else if (grepl("ROF", mod$studyAreaNameShort)) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
@@ -311,7 +324,7 @@ InitStudyAreaLCC <- function(sim) {
       1:39
     }
     uniqueLCCclasses <- na.omit(unique(LCC2005[]))
-    
+
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
 
