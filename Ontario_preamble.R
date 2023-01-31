@@ -17,7 +17,7 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
   reqdPkgs = list("archive", "geodata", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
-                  "PredictiveEcology/LandR@development (>= 1.1.0.9019)"),
+                  "PredictiveEcology/LandR@development (>= 1.1.0.9020)"),
   parameters = rbind(
     defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
@@ -462,7 +462,9 @@ InitStudyAreaLCC <- function(sim) {
   sim$nonTreePixels <- nonTreePixels
   sim$treeClasses <- sim$LandRforestedLCC
   sim$nontreeClasses <- nontreeClassesLCC
-  sim$flammableRTM <- defineFlammable(sim$LCC, nonFlammClasses = sim$nonflammableLCC, mask = sim$rasterToMatch)
+  sim$flammableRTM <- defineFlammable(crop(sim$LCC, sim$rasterToMatch),
+                                      nonFlammClasses = sim$nonflammableLCC,
+                                      mask = sim$rasterToMatch)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
   fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
