@@ -17,7 +17,7 @@ defineModule(sim, list(
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
   reqdPkgs = list("archive", "geodata", "httr", "raster", "rgeos", "reproducible", "sf", "sp",
                   "PredictiveEcology/reproducible@development (>= 1.2.8.9033)",
-                  "PredictiveEcology/LandR@development (>= 1.1.0.1019)"),
+                  "PredictiveEcology/LandR@development (>= 1.1.0.9019)"),
   parameters = rbind(
     defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
