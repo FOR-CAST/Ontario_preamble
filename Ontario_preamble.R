@@ -306,10 +306,17 @@ InitStudyAreaRTM <- function(sim) {
 }
 
 InitStudyAreaLCC <- function(sim) {
+
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$runName, currentModule(sim))
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+
+  allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
+    c(1:18, 21:24) ## classes 19 and 20 reclassified
+  } else {
+    1:39
+  }
 
   ## LANDCOVER MAPS (LCC2005 + FRI if AOU; Far North if ROF)
   if (mod$studyAreaNameShort == "AOU") {
@@ -318,11 +325,6 @@ InitStudyAreaLCC <- function(sim) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
-    allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
-      c(1:18, 21:24) ## classes 19 and 20 reclassified
-    } else {
-      1:39
-    }
     uniqueLCCclasses <- na.omit(unique(LCC2005[]))
 
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
@@ -392,15 +394,18 @@ InitStudyAreaLCC <- function(sim) {
     ## unable to download directly b/c of SSL, time outs, and other server problems
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
     ##
+
     LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = dPath)
     LCC_FN[LCC_FN[] <= 0] <- NA_integer_ ## remove 0, -9, and -99
     LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
+
     LCC_FN <- Cache(
       postProcess,
       LCC_FN,
       method = "ngb",
+      destinationPath = dPath,
       rasterToMatch = sim$rasterToMatchLarge,
-      filename2 = file.path("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
+      filename2 = paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
     )
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
@@ -423,7 +428,7 @@ InitStudyAreaLCC <- function(sim) {
     # "Sand/Gravel/Mine Tailings" = 21, "Bedrock" = 22, "Community/Infrastructure" = 23,
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
 
-    nIterations <- ifelse(grepl("ROF_shield", studyAreaName), 3, 3) ## TODO: revisit this
+    nIterations <- ifelse(grepl("ROF_shield", P(sim)$studyAreaName), 3, 3) ## TODO: revisit this
     LCC_FN <- Cache(LandR::convertUnwantedLCC2,
                     classesToReplace = 19:20,
                     rstLCC = LCC_FN,
@@ -647,14 +652,14 @@ InitAge <- function(sim) {
 
     ## since Raquel's age layer is "2015", subtract 4 years to make it 2011; subtract 14 for 2001.
     standAgeMap2001 <- modageMap - 14L - tsf2001
-    attr(standAgeMap2001, "imputedPixID") <- imputedPixID
+    imputedPixID2001 <- imputedPixID
 
     standAgeMap2011 <- modageMap - 4L - tsf2011
-    attr(standAgeMap2011, "imputedPixID") <- imputedPixID
+    imputedPixID2011 <- imputedPixID
   }
 
   sim$standAgeMap2001 <- asInteger(standAgeMap2001)
-  attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2011
+  attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2001
 
   sim$standAgeMap2011 <- asInteger(standAgeMap2011)
   attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
