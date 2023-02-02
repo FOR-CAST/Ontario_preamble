@@ -6,8 +6,9 @@
 #' @author Alex Chubaty
 #' @export
 #' @importFrom googledrive drive_download
-#' @importFrom raster raster union extent mosaic projectRaster res crs
+#' @importFrom raster raster
 #' @importFrom archive archive_extract
+#' @importFrom terra rast union ext mosaic project res crs
 prepInputsFarNorthLCC <- function(dPath) {
   ff <- file.path(dPath, "FarNorth_LandCover_Class_UTM17_mosaic.tif")
   if (!file.exists(ff)) {
@@ -38,26 +39,35 @@ prepInputsFarNorthLCC <- function(dPath) {
       unlink(file.path(dPath, "FarNorthLandCover", "Version 1.4"), recursive = TRUE)
     }
 
-    r15 <- raster(file.path(dPath, "FarNorthLandCover", basename(rFiles))[1])
-    r16 <- raster(file.path(dPath, "FarNorthLandCover", basename(rFiles))[2])
-    r17 <- raster(file.path(dPath, "FarNorthLandCover", basename(rFiles))[3])
+    r15 <- rast(file.path(dPath, "FarNorthLandCover", basename(rFiles))[1])
+    r16 <- rast(file.path(dPath, "FarNorthLandCover", basename(rFiles))[2])
+    r17 <- rast(file.path(dPath, "FarNorthLandCover", basename(rFiles))[3])
 
-    e15 <- extent(r15)
-    e16 <- extent(r16)
-    e17 <- extent(r17)
-    u <- raster::union(e15, e16) %>% raster::union(., e17)
-    template <- raster(u, res = res(r16),  crs = crs(r16))
+    e15 <- ext(r15)
+    e16 <- ext(r16)
+    e17 <- ext(r17)
+    u <- terra::union(e15, e16) |> terra::union(x = _, e17)
+    template <- rast(u, res = res(r16),  crs = crs(r16))
+
+    tempExtent1 <- tempfile(fileext = ".tif")
+    tempExtent2 <- tempfile(fileext = ".tif")
+    tempExtent3 <- tempfile(fileext = ".tif")
+
 
     f <- file.path(dPath, "FarNorthLandCover", paste0("FarNorth_LandCover_Class_UTM", 15:17, ".tif"))
-    t15 <- raster(f[1]) %>% projectRaster(., template, alignOnly = TRUE)
-    t16 <- raster(f[2]) %>% projectRaster(., template, alignOnly = TRUE)
-    t17 <- raster(f[3]) %>% projectRaster(., template, alignOnly = TRUE)
+    t15 <- rast(f[1]) |>  project(x = _, template, align = TRUE, filename = tempExtent2)
+    t16 <- rast(f[2]) |>  project(x = _, template, align = TRUE, filename = tempExtent2)
+    t17 <- rast(f[3]) |> project(x = _, template, align = TRUE, filename = tempExtent3)
 
-    r15 <- raster(f[1]) %>% projectRaster(., t15, method = "ngb", datatype = "INT2U")
-    r16 <- raster(f[2]) %>% projectRaster(., t16, method = "ngb", datatype = "INT2U")
-    r17 <- raster(f[3]) %>% projectRaster(., t17, method = "ngb", datatype = "INT2U")
+    r15 <- rast(f[1]) |> project(x = _, t15, method = "ngb", datatype = "INT2U", )
+    r16 <- rast(f[2]) |> project(x = _, t16, method = "ngb", datatype = "INT2U")
+    r17 <- rast(f[3]) |> project(x = _, t17, method = "ngb", datatype = "INT2U")
 
-    LCC_FN <- raster::mosaic(r15, r16, r17, fun = min, filename = ff) # overwrite = TRUE
+    LCC_FN <- terra::mosaic(r15, r16, r17, fun = min, filename = ff) # overwrite = TRUE
+    LCC_FN <- raster::raster(ff)
+
+    unlink(c(tempExtent1, tempExtent2, tempExtent3))
+    gc()
   } else {
     LCC_FN <- raster::raster(ff)
   }
