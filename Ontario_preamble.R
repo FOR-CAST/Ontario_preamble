@@ -152,10 +152,10 @@ InitStudyAreaRTM <- function(sim) {
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
   ## provincial boundary
-  mod$ON <- geodata::gadm(country = "CAN", level = 1, path = dPath) %>%
-    sf::st_as_sf(.) %>%
-    subset(., NAME_1 == "Ontario") %>%
-    sf::st_transform(., sim$targetCRS)
+  mod$ON <- geodata::gadm(country = "CAN", level = 1, path = dPath) |>
+    sf::st_as_sf() |>
+    subset(x = _, NAME_1 == "Ontario") |>
+    sf::st_transform(sim$targetCRS)
 
   ## ECOPROVINCES
   ecoprov <- prepInputs(
@@ -164,9 +164,9 @@ InitStudyAreaRTM <- function(sim) {
     alsoExtract = "similar",
     fun = "sf::st_read",
     destinationPath = dPath
-  ) %>%
-    subset(., ECOPROVINC %in% mod$ecoprov) %>%
-    st_transform(., sim$targetCRS)
+  ) |>
+    subset(x = _, ECOPROVINC %in% mod$ecoprov) |>
+    st_transform(crs = sim$targetCRS)
 
   ## ECOZONES
   ez <- switch(mod$studyAreaNameShort,
@@ -182,8 +182,8 @@ InitStudyAreaRTM <- function(sim) {
       alsoExtract = "similar",
       fun = "sf::st_read",
       destinationPath = dPath
-    ) %>%
-      st_transform(., sim$targetCRS)
+    ) |>
+      st_transform(crs = sim$targetCRS)
     ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
     ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ]
     rm(ecozones)
@@ -201,8 +201,8 @@ InitStudyAreaRTM <- function(sim) {
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    ) %>%
-      st_transform(., sim$targetCRS)
+    ) |>
+      st_transform(crs = sim$targetCRS)
 
     if (is.null(ecoprov)) {
       studyArea <- st_buffer(studyAreaReporting, 20000) |> as_Spatial()
@@ -224,8 +224,8 @@ InitStudyAreaRTM <- function(sim) {
       fun = "sf::st_read",
       overwrite = TRUE,
       team_drive = TRUE
-    ) %>%
-      st_transform(., sim$targetCRS)
+    ) |>
+      st_transform(crs = sim$targetCRS)
 
     if (is.null(ecoprov)) {
       studyAreaLarge <- as_Spatial(studyAreaLarge)
@@ -243,10 +243,10 @@ InitStudyAreaRTM <- function(sim) {
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
-    ) %>%
-      st_transform(., sim$targetCRS) %>%
-      st_intersection(., ecozone) %>%
-      as_Spatial(.)
+    ) |>
+      st_transform(crs = sim$targetCRS) |>
+      st_intersection(y = ecozone) |>
+      as_Spatial()
 
     studyArea <- buffer(studyAreaReporting, 20000) ## 20 km buffer
 
