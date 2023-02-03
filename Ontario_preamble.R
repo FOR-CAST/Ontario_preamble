@@ -403,10 +403,10 @@ InitStudyAreaLCC <- function(sim) {
       postProcess,
       LCC_FN,
       method = "ngb",
-      destinationPath = dPath,
       rasterToMatch = sim$rasterToMatchLarge,
-      filename2 = paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
+      filename2 = file.path(dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
     )
+    #dPath ignored?
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
     ## forest by the dominant species composition (i.e. fuel class) and not the landcover.
