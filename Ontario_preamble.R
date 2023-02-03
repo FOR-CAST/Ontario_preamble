@@ -307,10 +307,10 @@ InitStudyAreaRTM <- function(sim) {
 
 InitStudyAreaLCC <- function(sim) {
 
-  # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$runName, currentModule(sim))
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+  # # ! ----- EDIT BELOW ----- ! #
 
   allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
     c(1:18, 21:24) ## classes 19 and 20 reclassified
@@ -404,7 +404,8 @@ InitStudyAreaLCC <- function(sim) {
       LCC_FN,
       method = "ngb",
       rasterToMatch = sim$rasterToMatchLarge,
-      filename2 = file.path(dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
+      destinationPath = dPath,
+      filename2 = paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
     )
     #dPath ignored?
 
