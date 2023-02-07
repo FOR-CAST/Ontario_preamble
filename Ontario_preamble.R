@@ -404,8 +404,8 @@ InitStudyAreaLCC <- function(sim) {
       LCC_FN,
       method = "ngb",
       rasterToMatch = sim$rasterToMatchLarge,
-      destinationPath = dPath,
-      filename2 = paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif")
+      destinationPath = dPath, #this isn't working
+      filename2 = file.path(dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
     )
     #dPath ignored?
 
