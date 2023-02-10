@@ -325,7 +325,7 @@ InitStudyAreaLCC <- function(sim) {
       LCC2005 <- raster::disaggregate(LCC2005, fact = 2)
     }
 
-    uniqueLCCclasses <- na.omit(unique(LCC2005[]))
+    uniqueLCCclasses <- na.omit(unique(as.vector(values(LCC2005))))
 
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
@@ -334,7 +334,9 @@ InitStudyAreaLCC <- function(sim) {
                           destinationPath = dPath,
                           filename1 = "lcc_fri_ceon_250m.tif",
                           filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
-                          fun = "raster::raster", method = "ngb",
+                          # fun = getOption("reproducible.rasterRead", "raster::raster"),
+                          method = c("ngb"),
+                          overwrite = TRUE,
                           rasterToMatch = sim$rasterToMatchLarge)
     LCC_FRI <- setMinMax(LCC_FRI)
 
@@ -351,8 +353,8 @@ InitStudyAreaLCC <- function(sim) {
     ## 10 - forested
     nontreeClassesFRI <- 1:9
     treeClassesFRI <- 10
-    treePixelsFRI_TF <- LCC_FRI[] %in% treeClassesFRI
-    LandTypeFRI_NA <- is.na(LCC_FRI[])
+    treePixelsFRI_TF <- as.vector(values(LCC_FRI)) %in% treeClassesFRI
+    LandTypeFRI_NA <- is.na(as.vector(values(LCC_FRI)))
     noDataPixelsFRI <- LandTypeFRI_NA
     treePixelsCC <- which(treePixelsFRI_TF)
 
@@ -377,8 +379,8 @@ InitStudyAreaLCC <- function(sim) {
                      availableERC_by_Sp = NULL)
 
 
-    treePixelsLCC <- which(sim$LCC[] %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
-    nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
+    treePixelsLCC <- which(as.vector(values(sim$LCC)) %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
+    nonTreePixels <- which(as.vector(values(sim$LCC)) %in% nontreeClassesLCC)
 
     fireSenseForestedLCC <- LandRforestedLCC <- treeClassesLCC
     sim$nonForestClasses <- nontreeClassesLCC
@@ -389,6 +391,7 @@ InitStudyAreaLCC <- function(sim) {
       nonForest_lowFlam = c(21, 23:24, 26:29, 31)
     )
     sim$missingLCCGroup <- "nonForest_highFlam"
+
   } else if (grepl("ROF", mod$studyAreaNameShort)) {
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
@@ -396,8 +399,8 @@ InitStudyAreaLCC <- function(sim) {
     ##
 
     LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = dPath)
-    LCC_FN[LCC_FN[] <= 0] <- NA_integer_ ## remove 0, -9, and -99
-    LCC_FN[LCC_FN[] > 24] <- NA_integer_ ## remove >24
+    LCC_FN[as.vector(values(LCC_FN)) <= 0] <- NA_integer_ ## remove 0, -9, and -99
+    LCC_FN[as.vector(values(LCC_FN)) > 24] <- NA_integer_ ## remove >24
 
     LCC_FN <- Cache(
       postProcess,
@@ -442,13 +445,13 @@ InitStudyAreaLCC <- function(sim) {
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
     LandRforestedLCC <- c(9:10, 12, 14, 15:18)
 
-    treePixelsFN_TF <- LCC_FN[] %in% LandRforestedLCC
-    LandTypeFN_NA <- is.na(LCC_FN[])
+    treePixelsFN_TF <- as.vector(values(LCC_FN)) %in% LandRforestedLCC
+    LandTypeFN_NA <- is.na(as.vector(values(LCC_FN)))
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
-    treePixelsLCC <- which(sim$LCC[] %in% LandRforestedLCC)
-    nonTreePixels <- which(sim$LCC[] %in% nontreeClassesLCC)
+    treePixelsLCC <- which(as.vector(values(sim$LCC)) %in% LandRforestedLCC)
+    nonTreePixels <- which(as.vector(values(sim$LCC)) %in% nontreeClassesLCC)
 
     fireSenseForestedLCC <- c(15:18)
     nonflammableLCC <- c(1:6, 21:23, 24) ## TODO: reassess agriculture class 24
@@ -459,7 +462,7 @@ InitStudyAreaLCC <- function(sim) {
     sim$missingLCCGroup <- "BogSwamp"
   }
 
-  sim$LCC <- setValues(sim$LCC, asInteger(getValues(sim$LCC)))
+  sim$LCC <- LandR::asInt(sim$LCC)
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonForestLCCGroups <- nonForestLCCGroups
@@ -543,12 +546,12 @@ InitAge <- function(sim) {
     earliestFireYear <- as.integer(minValue(fireYear))
 
     minNonDisturbedAge2001 <- 2001L - earliestFireYear
-    toChange2001 <- is.na(fireYear[]) & standAgeMap2001[] <= minNonDisturbedAge2001
+    toChange2001 <- is.na(as.vector(values(fireYear))) & as.vector(values(standAgeMap2001)) <= minNonDisturbedAge2001
     standAgeMap2001[toChange2001] <- minNonDisturbedAge2001 + 2L ## make it an even 40 years old instead of 39
     imputedPixID2001 <- unique(attr(standAgeMap2001, "imputedPixID"), which(toChange2001))
 
     minNonDisturbedAge2011 <- 2011L - earliestFireYear
-    toChange2011 <- is.na(fireYear[]) & standAgeMap2011[] <= minNonDisturbedAge2011
+    toChange2011 <- is.na(as.vector(values(fireYear))) & as.vector(values(standAgeMap2011)) <= minNonDisturbedAge2011
     standAgeMap2011[toChange2011] <- minNonDisturbedAge2011 + 2L ## make it an even 50 years old instead of 49
     imputedPixID2011 <- unique(attr(standAgeMap2011, "imputedPixID"), which(toChange2011))
 
@@ -558,14 +561,16 @@ InitAge <- function(sim) {
                                    destinationPath = dPath,
                                    filename1 = "age_fri_ceon_250m.tif",
                                    filename2 = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
-                                   fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                   # fun = "raster::raster",
+                                   method = "bilinear", datatype = "INT2U",
                                    rasterToMatch = sim$rasterToMatchLarge,
                                    userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
                                   destinationPath = dPath,
                                   filename1 = "reference_year_fri_ceon_250m.tif",
                                   filename2 = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
-                                  fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                  # fun = "raster::raster",
+                                  method = "bilinear", datatype = "INT2U",
                                   rasterToMatch = sim$rasterToMatchLarge,
                                   userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
     } else if (mod$studyAreaNameShort == "ROF") {
@@ -576,14 +581,16 @@ InitAge <- function(sim) {
                                      destinationPath = dPath,
                                      filename1 = "age_fri_rof_125m.tif",
                                      filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
-                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                     # fun = "raster::raster",
+                                     method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
                                      userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
                                     destinationPath = dPath,
                                     filename1 = "reference_year_fri_rof_125m.tif",
                                     filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
-                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                    # fun = "raster::raster",
+                                    method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
                                     userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       } else if (P(sim)$.resolution == 250L) {
@@ -591,31 +598,32 @@ InitAge <- function(sim) {
                                      destinationPath = dPath,
                                      filename1 = "age_fri_rof_250m.tif",
                                      filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
-                                     fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                     # fun = "raster::raster",
+                                     method = "bilinear", datatype = "INT2U",
                                      rasterToMatch = sim$rasterToMatchLarge,
                                      userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim)))
         refYearMapFRI <- prepInputs(url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
                                     destinationPath = dPath,
                                     filename1 = "reference_year_fri_rof_250m.tif",
                                     filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
-                                    fun = "raster::raster", method = "bilinear", datatype = "INT2U",
+                                    # fun = "raster::raster", method = "bilinear", datatype = "INT2U",
                                     rasterToMatch = sim$rasterToMatchLarge,
                                     userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim)))
       }
       standAgeMapFRI <- setMinMax(standAgeMapFRI)
-      standAgeMapFRI[standAgeMapFRI[] < 0] <- 0L
+      standAgeMapFRI[as.vector(values(standAgeMapFRI)) < 0] <- 0L
 
       #   1. adjust each age by reference year, for 2001 and 2011 to get age in 2001 and 2011
       standAgeMapFRI2001 <- standAgeMapFRI - (refYearMapFRI - 2001L)
       standAgeMapFRI2011 <- standAgeMapFRI - (refYearMapFRI - 2011L)
 
       #   2. any values < 0, fall back to kNN values for these
-      noDataPixelsFRI2001 <- which(standAgeMapFRI2001[] < 0)
+      noDataPixelsFRI2001 <- which(as.vector(values(standAgeMapFRI2001)) < 0)
       standAgeMapFRI2001[noDataPixelsFRI2001] <- standAgeMap2001[noDataPixelsFRI2001]
       standAgeMap2001 <- standAgeMapFRI2001
       imputedPixID2001 <- unique(imputedPixID2001, noDataPixelsFRI2001)
 
-      noDataPixelsFRI2011 <- which(standAgeMapFRI2011[] < 0)
+      noDataPixelsFRI2011 <- which(as.vector(values(standAgeMapFRI2011)) < 0)
       standAgeMapFRI2011[noDataPixelsFRI2011] <- standAgeMap2011[noDataPixelsFRI2011]
       standAgeMap2011 <- standAgeMapFRI2011
       imputedPixID2011 <- unique(imputedPixID2011, noDataPixelsFRI2011)
@@ -629,12 +637,12 @@ InitAge <- function(sim) {
     modageMap <- prepInputs(
       url = "https://drive.google.com/file/d/1bfT5gUonIHVDAbgYIsDo2gE1qAUbMoli/", ## modage1,
       #url = "https://drive.google.com/file/d/139jxdQbzKjcUWLe87Ockqs8sMhsB_Jjz/", ## modage2
-      fun = "raster::raster",
+      # fun = "raster::raster",
       destinationPath = dPath,
       rasterToMatch = sim$rasterToMatchLarge
     )
-    modageMap <- asInteger(modageMap)
-    imputedPixID <- which(!is.na(modageMap[])) ## all pixels imputed
+    modageMap <- asInt(modageMap)
+    imputedPixID <- which(!is.na(as.vector(values(modageMap)))) ## all pixels imputed
 
     ## TODO: it doesn't look like Raquel's layer properly accounts for wildfire raster,
     ## so we will manually adjust it here. But the age map needs to be fixed in ROF_age and rebuilt.
@@ -643,11 +651,11 @@ InitAge <- function(sim) {
       url = "https://drive.google.com/file/d/1WcxdP-wyHBCnBO7xYGZ0qKgmvqvOzmxp/",
       targetFile = "wildfire_ROF.tif",
       destinationPath = dPath,
-      rasterToMatch = sim$rasterToMatch
+      rasterToMatch = sim$rasterToMatchLarge  # Eliot changed this to sim$rasterToMatchLarge -- TODO check with Alex
     )
-    wildfires <- wildfires2001 <- wildfires2011 <- asInteger(wildfires)
-    wildfires2001[wildfires[] > 2001] <- NA
-    wildfires2011[wildfires[] > 2011] <- NA
+    wildfires <- wildfires2001 <- wildfires2011 <- asInt(wildfires)
+    wildfires2001[as.vector(values(wildfires)) > 2001] <- NA
+    wildfires2011[as.vector(values(wildfires)) > 2011] <- NA
     tsf2001 <- 2001L - wildfires2001
     tsf2011 <- 2011L - wildfires2011
 
@@ -659,10 +667,10 @@ InitAge <- function(sim) {
     imputedPixID2011 <- imputedPixID
   }
 
-  sim$standAgeMap2001 <- asInteger(standAgeMap2001)
+  sim$standAgeMap2001 <- asInt(standAgeMap2001)
   attr(sim$standAgeMap2001, "imputedPixID") <- imputedPixID2001
 
-  sim$standAgeMap2011 <- asInteger(standAgeMap2011)
+  sim$standAgeMap2011 <- asInt(standAgeMap2011)
   attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
   # ! ----- STOP EDITING ----- ! #
