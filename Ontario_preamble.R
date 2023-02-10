@@ -98,7 +98,8 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       sim <- InitAge(sim)
 
       ## check that rasters all match
-      compareRaster(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011, orig = TRUE)
+      .compareRas(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011)
+      # compareRaster(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011, orig = TRUE)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
