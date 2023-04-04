@@ -6,7 +6,7 @@ defineModule(sim, list(
                       "Each is customized to the study area parameter passed via `studyAreaName`."),
   keywords = "",
   authors = c(
-    person(c("Alex", "M"), "Chubaty", role = c("aut", "cre"), email = "achubaty@for-cast.ca"),
+    person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca", role = c("aut", "cre")),
     person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
@@ -69,7 +69,7 @@ defineModule(sim, list(
     createsOutput("studyAreaPSP", "SpatialPolygonsDataFrame",
                   paste("this area will be used to subset PSP plots before building the statistical model.",
                         "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
-                        "Alberta, Boreal British Columbia, and Ontario")),
+                        "Alberta, Boreal British Columbia, and Ontario.")),
     createsOutput("studyAreaReporting", "SpatialPolygons", desc = "Unbuffered study area used for reporting/post-processing.")
   )
 ))
@@ -127,7 +127,7 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 
 InitSpecies <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
-  cacheTags <- c(P(sim)$runName, currentModule(sim))
+  cacheTags <- c(P(sim)$studyAreaName, currentModule(sim))
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
@@ -306,11 +306,11 @@ InitStudyAreaRTM <- function(sim) {
 }
 
 InitStudyAreaLCC <- function(sim) {
-
   cacheTags <- c(P(sim)$runName, currentModule(sim))
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
-  # # ! ----- EDIT BELOW ----- ! #
+
+  # ! ----- EDIT BELOW ----- ! #
 
   allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
     c(1:18, 21:24) ## classes 19 and 20 reclassified
