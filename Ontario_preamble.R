@@ -128,7 +128,7 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 InitSpecies <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$studyAreaName, currentModule(sim))
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim))
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## SPECIES STUFF
@@ -146,7 +146,7 @@ InitSpecies <- function(sim) {
 InitStudyAreaRTM <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim))
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   stopifnot(P(sim)$.resolution %in% c(125, 250))
@@ -305,7 +305,7 @@ InitStudyAreaRTM <- function(sim) {
 
 InitStudyAreaLCC <- function(sim) {
   cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim))
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
@@ -486,7 +486,7 @@ InitStudyAreaLCC <- function(sim) {
 InitAge <- function(sim) {
   # # ! ----- EDIT BELOW ----- ! #
   cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim))
   message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
@@ -684,7 +684,7 @@ InitAge <- function(sim) {
 
 .inputObjects <- function(sim) {
   cacheTags <- c(currentModule(sim), "function:.inputObjects")
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim))
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
