@@ -205,6 +205,7 @@ InitStudyAreaRTM <- function(sim) {
     ) |>
       st_transform(crs = sim$targetCRS)
 
+    ## TODO: use Erni et al. (2020) FRT polygons
     if (is.null(ecoprov)) {
       studyArea <- st_buffer(studyAreaReporting, 20000)
     } else {
@@ -235,6 +236,7 @@ InitStudyAreaRTM <- function(sim) {
         st_as_sf()
     }
   } else if (grepl("ROF", mod$studyAreaNameShort)) {
+    ## TODO: use Erni et al. (2020) FRT polygons
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
@@ -325,13 +327,15 @@ InitStudyAreaLCC <- function(sim) {
     treeClassesLCC <- c(1:15, 20, 32, 34:35)
     nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
 
-    LCC_FRI <- prepInputs(url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
-                          destinationPath = dPath,
-                          filename1 = "lcc_fri_ceon_250m.tif",
-                          filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
-                          fun = "terra::rast",
-                          method = "near",
-                          rasterToMatch = sim$rasterToMatchLarge)
+    LCC_FRI <- prepInputs(
+      url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
+      destinationPath = dPath,
+      filename1 = "lcc_fri_ceon_250m.tif",
+      filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
+      fun = "terra::rast",
+      method = "near",
+      rasterToMatch = sim$rasterToMatchLarge
+    )
     LCC_FRI <- setMinMax(LCC_FRI)
 
     ###### FRI LANDCOVER CLASSES
@@ -504,8 +508,7 @@ InitAge <- function(sim) {
 
     fireYear <- postProcess(fireYear, to = sim$rasterToMatchLarge) ## needed cropping
 
-    standAgeMap2001 <- Cache(
-      LandR::prepInputsStandAgeMap,
+    standAgeMap2001 <- LandR::prepInputsStandAgeMap(
       ageURL = standAgeMapURL,
       ageFun = "terra::rast",
       rasterToMatch = sim$rasterToMatchLarge,
@@ -513,13 +516,12 @@ InitAge <- function(sim) {
       destinationPath = dPath,
       startTime = 2001,
       fireFun = "terra::vect",
+      firePerimeters = fireYear,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName)),
-      userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
+      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName))
     )
 
-    standAgeMap2011 <- Cache(
-      LandR::prepInputsStandAgeMap,
+    standAgeMap2011 <- LandR::prepInputsStandAgeMap(
       ageURL = paste0("https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                       "canada-forests-attributes_attributs-forests-canada/",
                       "2011-attributes_attributs-2011/",
@@ -530,9 +532,9 @@ InitAge <- function(sim) {
       destinationPath = dPath,
       startTime = 2011,
       fireFun = "terra::vect",
+      firePerimeters = fireYear,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName)),
-      userTags = c("stable", currentModule(sim), P(sim)$studyAreaName)
+      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName))
     )
 
     ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
