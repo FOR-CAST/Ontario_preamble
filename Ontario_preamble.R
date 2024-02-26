@@ -21,9 +21,7 @@ defineModule(sim, list(
   parameters = rbind(
     defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
-                          "May also include the ecoprovince ID in which to run the model.",
-                          "Optionally, if 'ROF', then 'shield' or 'plain' can be specified too,",
-                          "to identify whether to run only in the Boreal Shield or Hudson Plains ecozone.")),
+                          "May also include the Fire Regmie Type ID in which to run the model.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
                     paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
                           "if FALSE, use Raquel's predicted age map from ROF_age.")),
@@ -46,7 +44,6 @@ defineModule(sim, list(
     expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput("ageMap", "SpatRaster", desc = "Age (time since disturbance) map, derived from national kNN product and ON FRI data."),
     createsOutput("fireSenseForestedLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "SpatRaster", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("LCC", "SpatRaster", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
@@ -89,8 +86,8 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       mod$studyAreaNameShort <- gsub("^ON_(AOU|ROF_plain|ROF_shield|ROF).*", "\\1", fullStudyAreaName)
 
       chunks <- strsplit(fullStudyAreaName, "_")[[1]]
-      mod$ecoprov <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
-      mod$ecoprov <- if (length(mod$ecoprov) > 0) mod$ecoprov else NULL
+      mod$frt <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
+      mod$FRT <- if (length(mod$FRT) > 0) mod$FRT else NULL
 
       sim <- InitSpecies(sim)
       sim <- InitStudyAreaRTM(sim)
@@ -157,40 +154,18 @@ InitStudyAreaRTM <- function(sim) {
     subset(x = _, NAME_1 == "Ontario") |>
     sf::st_transform(sim$targetCRS)
 
-  ## ECOPROVINCES
-  ecoprov <- prepInputs(
-    url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/province/ecoprovince_shp.zip",
-    targetFile = "ecoprovinces.shp",
+  ## FIRE REGIME TYPES
+  FRT <- prepInputs(
+    url = "https://zenodo.org/record/4458156/files/FRT.zip",
+    targetFile = "FRT_Canada.shp",
     alsoExtract = "similar",
     fun = "sf::st_read",
-    purge = TRUE,
     destinationPath = dPath
   ) |>
-    subset(x = _, ECOPROVINC %in% mod$ecoprov) |>
+    dplyr::rename(FRT = Cluster) |>
+    subset(x = _, FRT == mod$frt) |>
+    dplyr::mutate(FRT = as.factor(FRT)) |>
     st_transform(crs = sim$targetCRS)
-
-  ## ECOZONES
-  ez <- switch(mod$studyAreaNameShort,
-               ROF = c("BOREAL SHIELD", "HUDSON PLAIN"),
-               ROF_shield = "BOREAL SHIELD",
-               ROF_plain = "HUDSON PLAIN",
-               NULL)
-
-  if (!is.null(ez)) {
-    ecozones <- prepInputs(
-      url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/zone/ecozone_shp.zip",
-      targetFile = "ecozones.shp",
-      alsoExtract = "similar",
-      fun = "sf::st_read",
-      destinationPath = dPath
-    ) |>
-      st_transform(crs = sim$targetCRS)
-    ecozones[["ZONE_NAME"]] <- toupper(ecozones[["ZONE_NAME"]])
-    ecozone <- ecozones[ecozones$ZONE_NAME %in% ez, ]
-    rm(ecozones)
-  } else {
-    ecozone <- NULL
-  }
 
   ## STUDY AREA
   if (mod$studyAreaNameShort == "AOU") {
@@ -205,11 +180,14 @@ InitStudyAreaRTM <- function(sim) {
     ) |>
       st_transform(crs = sim$targetCRS)
 
-    ## TODO: use Erni et al. (2020) FRT polygons
-    if (is.null(ecoprov)) {
+    if (is.null(FRT)) {
       studyArea <- st_buffer(studyAreaReporting, 20000)
     } else {
-      studyAreaReporting <- st_intersection(studyAreaReporting, ecoprov)
+      studyAreaReporting <- st_intersection(studyAreaReporting, FRT) |> st_cast("POLYGON")
+      ## TODO: revisit this: currently taking largest polygon only to ensure contiguous area w/o overlap with other FRTs
+      studyAreaReporting <- studyAreaReporting[which(st_area(studyAreaReporting) ==
+                                                       max(st_area(studyAreaReporting))), ]
+
       studyArea <- st_buffer(studyAreaReporting, 20000) |>
         st_union() |>
         st_convex_hull() |>
@@ -227,8 +205,11 @@ InitStudyAreaRTM <- function(sim) {
     ) |>
       st_transform(crs = sim$targetCRS)
 
-    if (!is.null(ecoprov)) {
-      studyAreaLarge <- st_intersection(studyAreaLarge, ecoprov) |>
+    if (!is.null(FRT)) {
+      studyAreaLarge <- st_intersection(studyAreaLarge, FRT) |> st_cast("POLYGON")
+      ## TODO: revisit this: currently taking largest polygon only to ensure contiguous area w/o overlap with other FRTs
+      studyAreaLarge <- studyAreaLarge[which(st_area(studyAreaLarge) ==
+                                                       max(st_area(studyAreaLarge))), ] |>
         st_buffer(50000) |>
         st_union() |>
         st_convex_hull() |>
@@ -236,28 +217,17 @@ InitStudyAreaRTM <- function(sim) {
         st_as_sf()
     }
   } else if (grepl("ROF", mod$studyAreaNameShort)) {
-    ## TODO: use Erni et al. (2020) FRT polygons
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
       fun = "sf::st_read", destinationPath = dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) |>
-      st_transform(crs = sim$targetCRS) |>
-      st_intersection(y = ecozone)
+      st_transform(crs = sim$targetCRS)
 
     studyArea <- st_buffer(studyAreaReporting, 20000) ## 20 km buffer
 
     studyAreaLarge <- studyArea ## TODO: temporary workaround downstream raster mismatches
-    # studyAreaLarge <- prepInputs(
-    #   url = "https://drive.google.com/file/d/1iOXXIkvY-YaR9BTG_SRd5R_iLstk99n0",
-    #   targetCRS = sim$targetCRS, ## TODO: fails on Windows
-    #   targetFile = "ROF_RA_def_50km_buff.shp", alsoExtract = "similar",
-    #   fun = "sf::st_read", destinationPath = dPath,
-    #   filename2 = "ROF_RA_def_50km_buff", overwrite = TRUE
-    # ) %>%
-    #   st_intersection(., ecozone) %>%
-    #   as_Spatial(.)
   }
 
   sim$studyArea <- studyArea
