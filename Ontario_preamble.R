@@ -19,7 +19,7 @@ defineModule(sim, list(
                   "PredictiveEcology/reproducible@development (>= 2.0.8)",
                   "PredictiveEcology/LandR@development (>= 1.1.0.9067)"),
   parameters = rbind(
-    defineParameter("studyAreaName", "character", "ON_AOU_6.2", NA, NA,
+    defineParameter("studyAreaName", "character", "ON_AOU_5", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
                           "May also include the Fire Regmie Type ID in which to run the model.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
