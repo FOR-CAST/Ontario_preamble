@@ -1,40 +1,51 @@
 defineModule(sim, list(
   name = "Ontario_preamble",
-  description = paste("this module prepares 2 sets of objects needed for LandR simulations in Ontario AOU/ROF:",
-                      "1. study areas and corresponding rasterToMatch (as well as large versions);",
-                      "2. species equivalencies tables and the sppEquiv column.",
-                      "Each is customized to the study area parameter passed via `studyAreaName`."),
+  description = paste(
+    "this module prepares 2 sets of objects needed for LandR simulations in Ontario AOU/ROF:",
+    "1. study areas and corresponding rasterToMatch (as well as large versions);",
+    "2. species equivalencies tables and the sppEquiv column.",
+    "Each is customized to the study area parameter passed via `studyAreaName`."
+  ),
   keywords = "",
   authors = c(
     person(c("Alex", "M"), "Chubaty", email = "achubaty@for-cast.ca", role = c("aut", "cre")),
     person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
-  version = list(Ontario_preamble = "1.0.0"),
+  version = list(Ontario_preamble = "2.0.0"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.md", "Ontario_preamble.Rmd")),
-  reqdPkgs = list("archive", "geodata", "httr", "sf", "terra",
-                  "PredictiveEcology/reproducible@development (>= 2.0.8)",
-                  "PredictiveEcology/LandR@development (>= 1.1.0.9067)"),
+  reqdPkgs = list(
+    "archive", "geodata", "ggplot2", "ggspatial", "httr", "sf", "terra",
+    "PredictiveEcology/LandR@development (>= 1.1.5.9003)",
+    # "PredictiveEcology/map@development (>= 1.0.0)", ## TODO: create `map` object in separate module?
+    # "PredictiveEcology/pemisc@development (>= 0.0.4.9011)",
+    "PredictiveEcology/reproducible@development (>= 2.1.1.9002)",
+    "PredictiveEcology/scfmutils@development (>= 0.0.12)"
+  ),
   parameters = rbind(
+    defineParameter("fireRegimePolysType", "character", "FRT", NA, NA,
+                    paste("Polygon type to use for scfm `fireRegimePolys`:",
+                          "see `?scfmutils::prepInputsFireRegimePolys` for allowed types.")),
     defineParameter("studyAreaName", "character", "ON_AOU_5", NA, NA,
                     paste("Should include one of 'ON_AOU' or 'ON_ROF' to identify the study area.",
-                          "May also include the Fire Regmie Type ID in which to run the model.")),
+                          "May also include the Fire Regime Type ID in which to run the model.")),
     defineParameter("useAgeMapkNN", "logical", FALSE, NA, NA,
                     paste("if TRUE, use kNN age maps, corrected with fire polygons data;",
-                          "if FALSE, use Raquel's predicted age map from ROF_age.")),
-    defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
-                    "Describes the simulation time at which the first plot event should occur."),
-    defineParameter(".plotInterval", "numeric", NA, NA, NA,
-                    "Describes the simulation time interval between plot events."),
+                          "if FALSE, use Raquel's predicted age map from `ROF_age`.")),
     defineParameter(".resolution", "numeric", 250, NA, NA,
-                    "raster pixel size, in m,  to use for simulation. Either 250 or 125."),
+                    "raster pixel size, in metres,  to use for simulation. Either 250 or 125."),
+    defineParameter(".plots", "character", c("screen", "png"), NA, NA,
+                    "Used by `Plots()` to specify plot output types to produce."),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA,
                     "Describes the simulation time at which the first save event should occur."),
     defineParameter(".saveInterval", "numeric", NA, NA, NA,
                     "This describes the simulation time interval between save events."),
+    ## .seed is optional: `list('init' = 123)` will `set.seed(123)` for the `init` event only.
+    defineParameter(".seed", "list", list(), NA, NA,
+                    "Named list of seeds to use for each event (names)."),
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
@@ -44,30 +55,64 @@ defineModule(sim, list(
     expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput("fireSenseForestedLCC", "integer", desc = "vector of LCC classes considered to be forested by fireSense."),
-    createsOutput("flammableRTM", "SpatRaster", desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
-    createsOutput("LCC", "SpatRaster", desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
-    createsOutput("missingLCCgroup", "character", "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
-    createsOutput("nonflammableLCC", "integer", desc = "vector of LCC classes considered to be non-flammable"),
-    createsOutput("nonForestLCCGroups", "list",desc = "named list of non-forested landcover groups for fireSense"),
-    createsOutput("nontreeClasses", "integer", desc = "vector of LCC classes considered to be non-forested/treed."), ## TODO what is this used for?
-    createsOutput("nonTreePixels", "integer", desc = "pixel indices indicating non-treed pixels"), ## TODO: what is this used for?
-    createsOutput("rasterToMatch", "SpatRaster", desc = "Raster to match, based on study area."),
-    createsOutput("rasterToMatchLarge", "SpatRaster", desc = "Raster to match (large) based on `studyAreaLarge.`"),
-    createsOutput("rasterToMatchReporting", "SpatRaster", desc = "Raster to match based on `studyAreaReporting.`"),
-    createsOutput("speciesTable", "data.table", desc = "Species parameter table."),
-    createsOutput("sppColorVect", "character", desc = "Species colour vector."),
-    createsOutput("sppEquiv", "data.table", desc = "Species equivalency table."),
-    createsOutput("sppEquivCol", "character", desc = "name of column to use in `sppEquiv`."),
-    createsOutput("standAgeMap2001", "SpatRaster", desc = "raster of time since disurbance for year 2001."),
-    createsOutput("standAgeMap2011", "SpatRaster", desc = "raster of time since disurbance for year 2011."),
-    createsOutput("studyArea", "sf", desc = "Buffered study area in which to run simulations."),
-    createsOutput("studyAreaLarge", "sf", desc = "Buffered study area used for parameterization/calibration."),
+    createsOutput("fireRegimePolys", "sf",
+                  desc = "the corresponding fire regime for `studyArea`."),
+    createsOutput("fireRegimePolysLarge", "sf",
+                  desc = "the corresponding fire regime for `studyAreaLarge`."),
+    createsOutput("fireSenseForestedLCC", "integer",
+                  desc = "vector of LCC classes considered to be forested by fireSense."),
+    createsOutput("flammableRTM", "SpatRaster",
+                  desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
+    createsOutput("missingLCCgroup", "character",
+                  desc = "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
+    # createsOutput("ml", "map",
+    #               desc = "`map` object containing study areas, reporting polygons, etc. for post-processing."),
+    createsOutput("nonflammableLCC", "integer",
+                  desc = "vector of LCC classes considered to be non-flammable"),
+    createsOutput("nonForestLCCGroups", "list",
+                  desc = "named list of non-forested landcover groups for fireSense"),
+    createsOutput("nontreeClasses", "integer",
+                  desc = "vector of LCC classes considered to be non-forested/treed."), ## TODO what is this used for?
+    createsOutput("nonTreePixels", "integer",
+                  desc = "pixel indices indicating non-treed pixels"), ## TODO: what is this used for?
+    createsOutput("rasterToMatch", "SpatRaster",
+                  desc = "Raster to match, based on study area."),
+    createsOutput("rasterToMatchLarge", "SpatRaster",
+                  desc = "Raster to match (large) based on `studyAreaLarge.`"),
+    createsOutput("rasterToMatchReporting", "SpatRaster",
+                  desc = "Raster to match based on `studyAreaReporting.`"),
+    createsOutput("rstLCC2001", "SpatRaster",
+                  desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("rstLCC2011", "SpatRaster",
+                  desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("speciesTable", "data.table",
+                  desc = paste("a table of invariant species traits with the following trait colums:",
+                               "'species', 'Area', 'longevity', 'sexualmature', 'shadetolerance',",
+                               "'firetolerance', 'seeddistance_eff', 'seeddistance_max', 'resproutprob',",
+                               "'resproutage_min', 'resproutage_max', 'postfireregen', 'leaflongevity',",
+                               "'wooddecayrate', 'mortalityshape', 'growthcurve', 'leafLignin',",
+                               "'hardsoft'. Names can differ, but not the column order.",
+                               "Default is from Dominic Cyr and Yan Boulanger's project.")),
+    createsOutput("sppColorVect", "character",
+                  desc = paste("A named vector of colors to use for plotting.",
+                               "The names must be in `sim$sppEquiv[['ON']]`,",
+                               "and should also contain a color for 'Mixed'")),
+    createsOutput("sppEquiv", "data.table",
+                  desc = "table of species equivalencies. See `LandR::sppEquivalencies_CA`."),
+    createsOutput("standAgeMap2001", "SpatRaster",
+                  desc = "raster of time since disurbance for year 2001."),
+    createsOutput("standAgeMap2011", "SpatRaster",
+                  desc = "raster of time since disurbance for year 2011."),
+    createsOutput("studyArea", "sf",
+                  desc = "Buffered study area in which to run simulations."),
+    createsOutput("studyAreaLarge", "sf",
+                  desc = "Buffered study area used for parameterization/calibration."),
     createsOutput("studyAreaPSP", "sf",
-                  paste("this area will be used to subset PSP plots before building the statistical model.",
-                        "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
-                        "Alberta, Boreal British Columbia, and Ontario.")),
-    createsOutput("studyAreaReporting", "sf", desc = "Unbuffered study area used for reporting/post-processing.")
+                  desc = paste("this area will be used to subset PSP plots before building the statistical model.",
+                               "Currently PSP datasets with repeat measures exist only for Saskatchewan,",
+                               "Alberta, Boreal British Columbia, and Ontario.")),
+    createsOutput("studyAreaReporting", "sf",
+                  desc = "Unbuffered study area used for reporting/post-processing.")
   )
 ))
 
@@ -78,7 +123,10 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      # do stuff for this event
+      mod$dPath <- asPath(inputPath(sim))
+      message(currentModule(sim), ": using dataPath\n '", mod$dPath, "'.")
+
+      ## do stuff for this event
       fullStudyAreaName <- P(sim)$studyAreaName
       if (isFALSE(grepl("^ON_", fullStudyAreaName))) {
         fullStudyAreaName <- paste0("ON_", fullStudyAreaName)
@@ -87,34 +135,38 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 
       chunks <- strsplit(fullStudyAreaName, "_")[[1]]
       mod$frt <- chunks[which(!is.na(suppressWarnings(as.integer(chunks))))] ## keep as character
-      mod$FRT <- if (length(mod$FRT) > 0) mod$FRT else NULL
+      mod$FRT <- if (length(mod$FRT) > 0) mod$frt else NULL
 
       sim <- InitSpecies(sim)
       sim <- InitStudyAreaRTM(sim)
       sim <- InitStudyAreaLCC(sim)
       sim <- InitAge(sim)
+      sim <- InitFirePolys(sim)
 
       ## check that rasters all match
-      compareGeom(sim$rasterToMatchLarge, sim$LCC, sim$standAgeMap2001, sim$standAgeMap2011)
+      compareGeom(sim$rasterToMatchLarge, sim$rstLCC2001, sim$standAgeMap2001, sim$standAgeMap2011)
 
-      # schedule future event(s)
+      ## schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
     },
     plot = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-      ON <- as_Spatial(mod$ON)
-      Plot(ON, col = "Greens")
-      Plot(sim$studyArea, addTo = "ON", col = "Accent")
+      if (anyPlotting(P(sim)$.plots)) {
+        if ("screen" %in% P(sim)$.plots) {
+          ## TODO: use Plots() to allow saving figs as png etc.
+          ON <- as_Spatial(mod$ON)
+          Plot(ON, col = "Greens")
+          Plot(sim$studyArea, addTo = "ON", col = "Accent")
 
-      Plot(sim$rasterToMatch)
-      Plot(sim$rasterToMatchLarge)
+          Plot(sim$rasterToMatch)
+          Plot(sim$rasterToMatchLarge)
 
-      Plot(sim$ageMap2001)
-      Plot(sim$ageMap2011)
+          Plot(sim$ageMap2001)
+          Plot(sim$ageMap2011)
 
-      Plot(sim$LCC)
-      # ! ----- STOP EDITING ----- ! #
+          Plot(sim$rstLCC2001)
+          Plot(sim$rstLCC2011)
+        }
+      }
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
@@ -123,44 +175,37 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
 }
 
 InitSpecies <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-  cacheTags <- c(P(sim)$studyAreaName, currentModule(sim))
-  dPath <- asPath(inputPath(sim))
-  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitSpecies")
 
   ## SPECIES STUFF
   sim$sppEquiv <- makeSppEquivON()
-  sim$sppEquivCol <- "ON"
 
-  sim$sppColorVect <- sppColors(sim$sppEquiv, sim$sppEquivCol, newVals = "Mixed", palette = "Accent")
+  sim$sppColorVect <- sppColors(sim$sppEquiv, "ON", newVals = "Mixed", palette = "Accent")
 
-  sim$speciesTable <- getSpeciesTable(dPath = dPath) ## uses default URL
+  sim$speciesTable <- getSpeciesTable(dPath = mod$dPath) ## uses default URL
 
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
 InitStudyAreaRTM <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-  cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(inputPath(sim))
-  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitStudyAreaRTM")
 
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
+  # # ! ----- EDIT BELOW ----- ! #
   ## provincial boundary
-  mod$ON <- geodata::gadm(country = "CAN", level = 1, path = dPath) |>
+  mod$ON <- geodata::gadm(country = "CAN", level = 1, path = mod$dPath) |>
     sf::st_as_sf() |>
     subset(x = _, NAME_1 == "Ontario") |>
     sf::st_transform(sim$targetCRS)
 
   ## FIRE REGIME TYPES
-  FRT <- prepInputs(
+  frtPolys <- prepInputs(
     url = "https://zenodo.org/record/4458156/files/FRT.zip",
     targetFile = "FRT_Canada.shp",
     alsoExtract = "similar",
     fun = "sf::st_read",
-    destinationPath = dPath
+    destinationPath = mod$dPath
   ) |>
     dplyr::rename(FRT = Cluster) |>
     subset(x = _, FRT == mod$frt) |>
@@ -171,7 +216,7 @@ InitStudyAreaRTM <- function(sim) {
   if (mod$studyAreaNameShort == "AOU") {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1Idtreoo51hGBdfJXp0BmN83bOkKHTXvk",
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       targetFile = "CEON_def.shp",
       alsoExtract = "similar",
       fun = "sf::st_read",
@@ -180,10 +225,10 @@ InitStudyAreaRTM <- function(sim) {
     ) |>
       st_transform(crs = sim$targetCRS)
 
-    if (is.null(FRT)) {
+    if (is.null(mod$FRT)) {
       studyArea <- st_buffer(studyAreaReporting, 20000)
     } else {
-      studyAreaReporting <- st_intersection(studyAreaReporting, FRT) |> st_cast("POLYGON")
+      studyAreaReporting <- st_intersection(studyAreaReporting, frtPolys) |> st_cast("POLYGON")
       ## TODO: revisit this: currently taking largest polygon only to ensure contiguous area w/o overlap with other FRTs
       studyAreaReporting <- studyAreaReporting[which(st_area(studyAreaReporting) ==
                                                        max(st_area(studyAreaReporting))), ]
@@ -196,7 +241,7 @@ InitStudyAreaRTM <- function(sim) {
 
     studyAreaLarge <- prepInputs(
       url = "https://drive.google.com/file/d/1ngQshBgoyLjkjuXnloXPg7IUMdLmppkB",
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       targetFile = "CEON_def_50km_buff.shp",
       alsoExtract = "similar",
       fun = "sf::st_read",
@@ -205,13 +250,13 @@ InitStudyAreaRTM <- function(sim) {
     ) |>
       st_transform(crs = sim$targetCRS)
 
-    if (!is.null(FRT)) {
-      studyAreaLarge <- st_intersection(studyAreaLarge, FRT) |> st_cast("POLYGON")
+    if (!is.null(mod$FRT)) {
+      studyAreaLarge <- st_intersection(studyAreaLarge, frtPolys) |> st_cast("POLYGON")
       ## TODO: revisit this: currently taking largest polygon only to ensure contiguous area w/o overlap with other FRTs
       studyAreaLarge <- studyAreaLarge[which(st_area(studyAreaLarge) ==
                                                        max(st_area(studyAreaLarge))), ] |>
-        st_buffer(50000) |>
         st_union() |>
+        st_buffer(50000) |>
         st_convex_hull() |>
         nngeo::st_remove_holes() |>
         st_as_sf()
@@ -220,7 +265,7 @@ InitStudyAreaRTM <- function(sim) {
     studyAreaReporting <- prepInputs(
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
-      fun = "sf::st_read", destinationPath = dPath,
+      fun = "sf::st_read", destinationPath = mod$dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) |>
       st_transform(crs = sim$targetCRS)
@@ -238,21 +283,21 @@ InitStudyAreaRTM <- function(sim) {
   sim$rasterToMatch <- Cache(LandR::prepInputsLCC,
                              year = 2005,
                              studyArea = sim$studyArea,
-                             destinationPath = dPath,
+                             destinationPath = mod$dPath,
                              useCache = P(sim)$.useCache,
                              filename2 = NULL)
 
   sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
                                   year = 2005,
                                   studyArea = sim$studyAreaLarge,
-                                  destinationPath = dPath,
+                                  destinationPath = mod$dPath,
                                   useCache = P(sim)$.useCache,
                                   filename2 = NULL)
 
   sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
                                       year = 2005,
                                       studyArea = sim$studyAreaReporting,
-                                      destinationPath = dPath,
+                                      destinationPath = mod$dPath,
                                       useCache = P(sim)$.useCache,
                                       filename2 = NULL)
 
@@ -262,11 +307,11 @@ InitStudyAreaRTM <- function(sim) {
     sim$rasterToMatchReporting <- terra::disagg(sim$rasterToMatchReporting, fact = 2)
   }
 
-  writeRaster(sim$rasterToMatch, file.path(dPath, paste0(P(sim)$studyAreaName, "_rtm.tif")),
+  writeRaster(sim$rasterToMatch, file.path(mod$dPath, paste0(P(sim)$studyAreaName, "_rtm.tif")),
               datatype = "INT1U", overwrite = TRUE)
-  writeRaster(sim$rasterToMatchLarge,  file.path(dPath, paste0(P(sim)$studyAreaName, "_rtml.tif")),
+  writeRaster(sim$rasterToMatchLarge,  file.path(mod$dPath, paste0(P(sim)$studyAreaName, "_rtml.tif")),
               datatype = "INT1U", overwrite = TRUE)
-  writeRaster(sim$rasterToMatchReporting,  file.path(dPath, paste0(P(sim)$studyAreaName, "_rtmr.tif")),
+  writeRaster(sim$rasterToMatchReporting,  file.path(mod$dPath, paste0(P(sim)$studyAreaName, "_rtmr.tif")),
               datatype = "INT1U", overwrite = TRUE)
 
   # ! ----- STOP EDITING ----- ! #
@@ -274,9 +319,7 @@ InitStudyAreaRTM <- function(sim) {
 }
 
 InitStudyAreaLCC <- function(sim) {
-  cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(inputPath(sim))
-  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitStudyAreaLCC")
 
   # ! ----- EDIT BELOW ----- ! #
 
@@ -288,9 +331,9 @@ InitStudyAreaLCC <- function(sim) {
 
   ## LANDCOVER MAPS (LCC2005 + FRI if AOU; Far North if ROF)
   if (mod$studyAreaNameShort == "AOU") {
-    LCC2005 <- prepInputsLCC(year = 2005, ## TODO: use LCC2010
+    LCC2005 <- prepInputsLCC(year = 2005,
                              to = sim$rasterToMatchLarge,
-                             destinationPath = dPath)
+                             destinationPath = mod$dPath)
 
     uniqueLCCclasses <- na.omit(unique(as.vector(values(LCC2005))))
 
@@ -299,7 +342,7 @@ InitStudyAreaLCC <- function(sim) {
 
     LCC_FRI <- prepInputs(
       url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       filename1 = "lcc_fri_ceon_250m.tif",
       filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
       fun = "terra::rast",
@@ -338,16 +381,18 @@ InitStudyAreaLCC <- function(sim) {
     remapDT[is.na(LCC2005) & LCC_FRI %in% 10, newLCC := 99] ## reclassification needed
     remapDT[LCC2005 %in% treeClassesToReplace, newLCC := 99] ## reclassification needed
 
-    sim$LCC <- Cache(overlayLCCs,
-                     LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
-                     forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
-                     outputLayer = "LCC2005",
-                     remapTable = remapDT,
-                     classesToReplace = c(treeClassesToReplace, 99),
-                     availableERC_by_Sp = NULL)
+    sim$rstLCC2001 <- Cache(overlayLCCs,
+                            LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
+                            forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
+                            outputLayer = "LCC2005",
+                            remapTable = remapDT,
+                            classesToReplace = c(treeClassesToReplace, 99),
+                            availableERC_by_Sp = NULL)
 
-    treePixelsLCC <- which(as.vector(values(sim$LCC)) %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
-    nonTreePixels <- which(as.vector(values(sim$LCC)) %in% nontreeClassesLCC)
+    sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
+
+    treePixelsLCC <- which(as.vector(values(sim$rstLCC2001)) %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
+    nonTreePixels <- which(as.vector(values(sim$rstLCC2001)) %in% nontreeClassesLCC)
 
     fireSenseForestedLCC <- LandRforestedLCC <- treeClassesLCC
     sim$nonForestClasses <- nontreeClassesLCC
@@ -364,7 +409,7 @@ InitStudyAreaLCC <- function(sim) {
     ##   https://ws.gisetl.lrc.gov.on.ca/fmedatadownload/Packages/FarNorthLandCover.zip
     ##
 
-    LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = dPath)
+    LCC_FN <- Cache(prepInputsFarNorthLCC, dPath = mod$dPath)
     LCC_FN[as.vector(values(LCC_FN)) <= 0] <- NA_integer_ ## remove 0, -9, and -99
     LCC_FN[as.vector(values(LCC_FN)) > 24] <- NA_integer_ ## remove >24
 
@@ -373,10 +418,9 @@ InitStudyAreaLCC <- function(sim) {
       LCC_FN,
       method = "ngb",
       to = sim$rasterToMatchLarge,
-      destinationPath = dPath, #this isn't working
-      filename2 = file.path(dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
+      destinationPath = mod$dPath,
+      filename2 = file.path(mod$dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
     )
-    #dPath ignored?
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
     ## forest by the dominant species composition (i.e. fuel class) and not the landcover.
@@ -407,7 +451,9 @@ InitStudyAreaLCC <- function(sim) {
                     invalidClasses = c(1:5, 21:24),
                     userTags = c("convertUnwantedLCC2", studyAreaName))
 
-    sim$LCC <- LCC_FN
+    sim$rstLCC2001 <- LCC_FN
+    sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
+
     nontreeClassesLCC <- c(1:8, 11, 13, 21:24)
     LandRforestedLCC <- c(9:10, 12, 14, 15:18)
 
@@ -416,8 +462,8 @@ InitStudyAreaLCC <- function(sim) {
     noDataPixelsFN <- LandTypeFN_NA
     treePixelsCC <- which(treePixelsFN_TF)
 
-    treePixelsLCC <- which(as.vector(values(sim$LCC)) %in% LandRforestedLCC)
-    nonTreePixels <- which(as.vector(values(sim$LCC)) %in% nontreeClassesLCC)
+    treePixelsLCC <- which(as.vector(values(sim$rstLCC2001)) %in% LandRforestedLCC)
+    nonTreePixels <- which(as.vector(values(sim$rstLCC2001)) %in% nontreeClassesLCC)
 
     fireSenseForestedLCC <- c(15:18)
     nonflammableLCC <- c(1:6, 21:23, 24) ## TODO: reassess agriculture class 24
@@ -428,7 +474,8 @@ InitStudyAreaLCC <- function(sim) {
     sim$missingLCCGroup <- "BogSwamp"
   }
 
-  sim$LCC <- setValues(sim$LCC, asInteger(as.vector(values(sim$LCC))))
+  sim$rstLCC2001 <- setValues(sim$rstLCC2001, asInteger(as.vector(values(sim$rstLCC2001))))
+  sim$rstLCC2011 <- setValues(sim$rstLCC2011, asInteger(as.vector(values(sim$rstLCC2011))))
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
   sim$nonForestLCCGroups <- nonForestLCCGroups
@@ -437,7 +484,7 @@ InitStudyAreaLCC <- function(sim) {
   sim$nonTreePixels <- nonTreePixels
   sim$treeClasses <- sim$LandRforestedLCC
   sim$nontreeClasses <- nontreeClassesLCC
-  sim$flammableRTM <- defineFlammable(crop(sim$LCC, sim$rasterToMatch),
+  sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
                                       nonFlammClasses = sim$nonflammableLCC,
                                       mask = sim$rasterToMatch)
 
@@ -454,36 +501,34 @@ InitStudyAreaLCC <- function(sim) {
 }
 
 InitAge <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-  cacheTags <- c(P(sim)$runName, currentModule(sim))
-  dPath <- asPath(inputPath(sim))
-  message(currentModule(sim), ": using dataPath\n '", dPath, "'.")
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitAge")
 
+  # # ! ----- EDIT BELOW ----- ! #
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   if (isTRUE(P(sim)$useAgeMapkNN)) {
-    standAgeMapURL <- paste0(
-      "http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+    standAgeMapURL2001 <- paste0(
+      "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
       "canada-forests-attributes_attributs-forests-canada/2001-attributes_attributs-2001/",
       "NFI_MODIS250m_2001_kNN_Structure_Stand_Age_v1.tif"
     )
-    standAgeMapFileName <- basename(standAgeMapURL)
+    standAgeMapURL2011 <- gsub("2001", "2011", standAgeMapURL2001)
 
     fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
 
     fireYear <- Cache(prepInputsFireYear,
                       earliestYear = 1950,
                       url = fireURL,
-                      destinationPath = dPath,
+                      destinationPath = mod$dPath,
                       rasterToMatch = sim$rasterToMatchLarge)
 
     fireYear <- postProcess(fireYear, to = sim$rasterToMatchLarge) ## needed cropping
 
     standAgeMap2001 <- LandR::prepInputsStandAgeMap(
-      ageURL = standAgeMapURL,
+      ageURL = standAgeMapURL2001,
       ageFun = "terra::rast",
       rasterToMatch = sim$rasterToMatchLarge,
       studyArea = sim$studyAreaLarge,
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       startTime = 2001,
       fireFun = "terra::vect",
       firePerimeters = fireYear,
@@ -492,14 +537,11 @@ InitAge <- function(sim) {
     )
 
     standAgeMap2011 <- LandR::prepInputsStandAgeMap(
-      ageURL = paste0("https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
-                      "canada-forests-attributes_attributs-forests-canada/",
-                      "2011-attributes_attributs-2011/",
-                      "NFI_MODIS250m_2011_kNN_Structure_Stand_Age_v1.tif"),
+      ageURL = standAgeMapURL2011,
       ageFun = "terra::rast",
       rasterToMatch = sim$rasterToMatchLarge,
       studyArea = sim$studyAreaLarge,
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       startTime = 2011,
       fireFun = "terra::vect",
       firePerimeters = fireYear,
@@ -527,7 +569,7 @@ InitAge <- function(sim) {
     if (mod$studyAreaNameShort == "AOU") {
       standAgeMapFRI <- prepInputs(
         url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
-        destinationPath = dPath,
+        destinationPath = mod$dPath,
         filename1 = "age_fri_ceon_250m.tif",
         filename2 = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
         fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -536,7 +578,7 @@ InitAge <- function(sim) {
       )
       refYearMapFRI <- prepInputs(
         url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
-        destinationPath = dPath,
+        destinationPath = mod$dPath,
         filename1 = "reference_year_fri_ceon_250m.tif",
         filename2 = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
         fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -549,7 +591,7 @@ InitAge <- function(sim) {
       if (P(sim)$.resolution == 125L) {
         standAgeMapFRI <- prepInputs(
           url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
-          destinationPath = dPath,
+          destinationPath = mod$dPath,
           filename1 = "age_fri_rof_125m.tif",
           filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -558,7 +600,7 @@ InitAge <- function(sim) {
         )
         refYearMapFRI <- prepInputs(
           url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
-          destinationPath = dPath,
+          destinationPath = mod$dPath,
           filename1 = "reference_year_fri_rof_125m.tif",
           filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -568,7 +610,7 @@ InitAge <- function(sim) {
       } else if (P(sim)$.resolution == 250L) {
         standAgeMapFRI <- prepInputs(
           url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
-          destinationPath = dPath,
+          destinationPath = mod$dPath,
           filename1 = "age_fri_rof_250m.tif",
           filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -577,7 +619,7 @@ InitAge <- function(sim) {
         )
         refYearMapFRI <- prepInputs(
           url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
-          destinationPath = dPath,
+          destinationPath = mod$dPath,
           filename1 = "reference_year_fri_rof_250m.tif",
           filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
@@ -613,7 +655,7 @@ InitAge <- function(sim) {
       url = "https://drive.google.com/file/d/1bfT5gUonIHVDAbgYIsDo2gE1qAUbMoli/", ## modage1,
       #url = "https://drive.google.com/file/d/139jxdQbzKjcUWLe87Ockqs8sMhsB_Jjz/", ## modage2
       fun = "terra::rast",
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       rasterToMatch = sim$rasterToMatchLarge
     )
     modageMap <- as.int(modageMap)
@@ -625,7 +667,7 @@ InitAge <- function(sim) {
       prepInputs,
       url = "https://drive.google.com/file/d/1WcxdP-wyHBCnBO7xYGZ0qKgmvqvOzmxp/",
       targetFile = "wildfire_ROF.tif",
-      destinationPath = dPath,
+      destinationPath = mod$dPath,
       rasterToMatch = sim$rasterToMatch
     )
     wildfires <- wildfires2001 <- wildfires2011 <- as.int(wildfires)
@@ -652,13 +694,31 @@ InitAge <- function(sim) {
   return(invisible(sim))
 }
 
+InitFirePolys <- function(sim) {
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitFirePolys", P(sim)$fireRegimePolysType)
+
+  message("Preparing fire polygons for scfm...")
+
+  sim$fireRegimePolysLarge <- Cache(
+    scfmutils::prepInputsFireRegimePolys,
+    url = NULL,
+    destinationPath = mod$dPath,
+    studyArea = sim$studyAreaLarge,
+    type = P(sim)$fireRegimePolysType,
+    useCache = FALSE,
+    userTags = c(cacheTags, "fireRegimePolysLarge")
+  )
+  sim$fireRegimePolys <- postProcess(sim$fireRegimePolysLarge, studyArea = sim$studyArea)
+
+  return(invisible(sim))
+}
+
 .inputObjects <- function(sim) {
-  cacheTags <- c(currentModule(sim), "function:.inputObjects")
-  dPath <- asPath(inputPath(sim))
-  message(currentModule(sim), ": using dataPath '", dPath, "'.")
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:.inputObjects")
 
   # ! ----- EDIT BELOW ----- ! #
-  if (!suppliedElsewhere(targetCRS)) {
+  if (!suppliedElsewhere("targetCRS")) {
+    ## TODO: just make this in mod, not as an input
     sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
                            "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
   }
