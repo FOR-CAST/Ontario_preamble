@@ -63,6 +63,8 @@ defineModule(sim, list(
                   desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "SpatRaster",
                   desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
+    createsOutput("flammableRTML", "SpatRaster",
+                  desc = "RTML without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("missingLCCgroup", "character",
                   desc = "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
     # createsOutput("ml", "map",
@@ -85,6 +87,7 @@ defineModule(sim, list(
                   desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("rstLCC2011", "SpatRaster",
                   desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
+    createsOutput("rstTimeSinceFire", "SpatRaster", desc = NA),
     createsOutput("speciesTable", "data.table",
                   desc = paste("a table of invariant species traits with the following trait colums:",
                                "'species', 'Area', 'longevity', 'sexualmature', 'shadetolerance',",
@@ -487,6 +490,9 @@ InitStudyAreaLCC <- function(sim) {
   sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
                                       nonFlammClasses = sim$nonflammableLCC,
                                       mask = sim$rasterToMatch)
+  sim$flammableRTML <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatchLarge),
+                                       nonFlammClasses = sim$nonflammableLCC,
+                                       mask = sim$rasterToMatchLarge)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
   fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
@@ -496,14 +502,12 @@ InitStudyAreaLCC <- function(sim) {
          "Assigned to fireSense classes: ", fS_classes)
   }
 
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
 InitAge <- function(sim) {
   cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitAge")
 
-  # # ! ----- EDIT BELOW ----- ! #
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
   if (isTRUE(P(sim)$useAgeMapkNN)) {
     standAgeMapURL2001 <- paste0(
@@ -690,7 +694,8 @@ InitAge <- function(sim) {
   sim$standAgeMap2011 <- as.int(standAgeMap2011)
   attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
-  # ! ----- STOP EDITING ----- ! #
+  sim$rstTimeSinceFire <- terra::crop(sim$standAgeMap2001, sim$rasterToMatch)
+
   return(invisible(sim))
 }
 
