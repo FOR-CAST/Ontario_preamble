@@ -52,7 +52,7 @@ defineModule(sim, list(
                           "and time are not relevant"))
   ),
   inputObjects = bindrows(
-    expectsInput("targetCRS", "character", desc = "Geospatial projection to use.", sourceURL = NA)
+    ## none
   ),
   outputObjects = bindrows(
     createsOutput("fireRegimePolys", "sf",
@@ -129,6 +129,9 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       mod$dPath <- asPath(inputPath(sim))
       message(currentModule(sim), ": using dataPath\n '", mod$dPath, "'.")
 
+      mod$targetCRS <- paste("+proj=lcc +lat_0=0 +lon_0=-95 +lat_1=49 +lat_2=77",
+                             "+x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs")
+
       ## do stuff for this event
       fullStudyAreaName <- P(sim)$studyAreaName
       if (isFALSE(grepl("^ON_", fullStudyAreaName))) {
@@ -200,7 +203,7 @@ InitStudyAreaRTM <- function(sim) {
   mod$ON <- geodata::gadm(country = "CAN", level = 1, path = mod$dPath) |>
     sf::st_as_sf() |>
     subset(x = _, NAME_1 == "Ontario") |>
-    sf::st_transform(sim$targetCRS)
+    sf::st_transform(mod$targetCRS)
 
   ## FIRE REGIME TYPES
   frtPolys <- prepInputs(
@@ -213,7 +216,7 @@ InitStudyAreaRTM <- function(sim) {
     dplyr::rename(FRT = Cluster) |>
     subset(x = _, FRT == mod$frt) |>
     dplyr::mutate(FRT = as.factor(FRT)) |>
-    st_transform(crs = sim$targetCRS)
+    st_transform(crs = mod$targetCRS)
 
   ## STUDY AREA
   if (mod$studyAreaNameShort == "AOU") {
@@ -226,7 +229,7 @@ InitStudyAreaRTM <- function(sim) {
       overwrite = TRUE,
       team_drive = TRUE
     ) |>
-      st_transform(crs = sim$targetCRS)
+      st_transform(crs = mod$targetCRS)
 
     if (is.null(mod$FRT)) {
       studyArea <- st_buffer(studyAreaReporting, 20000)
@@ -251,7 +254,7 @@ InitStudyAreaRTM <- function(sim) {
       overwrite = TRUE,
       team_drive = TRUE
     ) |>
-      st_transform(crs = sim$targetCRS)
+      st_transform(crs = mod$targetCRS)
 
     if (!is.null(mod$FRT)) {
       studyAreaLarge <- st_intersection(studyAreaLarge, frtPolys) |> st_cast("POLYGON")
@@ -271,7 +274,7 @@ InitStudyAreaRTM <- function(sim) {
       fun = "sf::st_read", destinationPath = mod$dPath,
       filename2 = "ROF_RA_def", overwrite = TRUE
     ) |>
-      st_transform(crs = sim$targetCRS)
+      st_transform(crs = mod$targetCRS)
 
     studyArea <- st_buffer(studyAreaReporting, 20000) ## 20 km buffer
 
@@ -720,15 +723,7 @@ InitFirePolys <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:.inputObjects")
+  ## none
 
-  # ! ----- EDIT BELOW ----- ! #
-  if (!suppliedElsewhere("targetCRS")) {
-    ## TODO: just make this in mod, not as an input
-    sim$targetCRS <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
-                           "+x_0=0 +y_0=0 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
-  }
-
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
