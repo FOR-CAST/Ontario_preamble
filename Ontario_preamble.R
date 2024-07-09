@@ -149,8 +149,16 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       sim <- InitAge(sim)
       sim <- InitFirePolys(sim)
 
-      ## check that rasters all match
-      compareGeom(sim$rasterToMatchLarge, sim$rstLCC2001, sim$standAgeMap2001, sim$standAgeMap2011)
+      ## check GIS
+      compareGeom(sim$rasterToMatchLarge, sim$flammableRTML,
+                  sim$rstLCC2001, sim$rstLCC2011,
+                  sim$standAgeMap2001, sim$standAgeMap2011)
+      stopifnot(
+        same.crs(sim$fireRegimePolys, sim$flammableRTM),
+        same.crs(sim$fireRegimePolysLarge, sim$flammableRTML),
+        same.crs(sim$fireRegimePolys, sim$studyArea),
+        same.crs(sim$fireRegimePolysLarge, sim$studyAreaLarge)
+      )
 
       ## schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "Ontario_preamble", "plot", .last())
@@ -726,8 +734,10 @@ InitFirePolys <- function(sim) {
     Cache(
       useCache = FALSE,
       userTags = c(cacheTags, "fireRegimePolysLarge")
-    )
-  sim$fireRegimePolys <- postProcessTo(sim$fireRegimePolysLarge, to = sim$studyArea)
+    ) |>
+    st_transform(mod$targetCRS)
+  sim$fireRegimePolys <- postProcessTo(sim$fireRegimePolysLarge, to = sim$studyArea) |>
+    st_transform(mod$targetCRS)
 
   return(invisible(sim))
 }
