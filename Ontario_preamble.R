@@ -296,7 +296,7 @@ InitStudyAreaRTM <- function(sim) {
   ## RASTERS TO MATCH
   sim$rasterToMatch <- LandR::prepInputsLCC(
     year = 2005,
-    studyArea = sim$studyArea,
+    to = sim$studyArea,
     destinationPath = mod$dPath,
     filename2 = NULL
   ) |>
@@ -304,7 +304,7 @@ InitStudyAreaRTM <- function(sim) {
 
   sim$rasterToMatchLarge <- LandR::prepInputsLCC(
     year = 2005,
-    studyArea = sim$studyAreaLarge,
+    to = sim$studyAreaLarge,
     destinationPath = mod$dPath,
     filename2 = NULL
   ) |>
@@ -312,7 +312,7 @@ InitStudyAreaRTM <- function(sim) {
 
   sim$rasterToMatchReporting <- LandR::prepInputsLCC(
     year = 2005,
-    studyArea = sim$studyAreaReporting,
+    to = sim$studyAreaReporting,
     destinationPath = mod$dPath,
     filename2 = NULL
   ) |>
