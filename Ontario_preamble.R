@@ -286,26 +286,29 @@ InitStudyAreaRTM <- function(sim) {
   sim$studyAreaReporting <- studyAreaReporting
 
   ## RASTERS TO MATCH
-  sim$rasterToMatch <- Cache(LandR::prepInputsLCC,
-                             year = 2005,
-                             studyArea = sim$studyArea,
-                             destinationPath = mod$dPath,
-                             useCache = P(sim)$.useCache,
-                             filename2 = NULL)
+  sim$rasterToMatch <- LandR::prepInputsLCC(
+    year = 2005,
+    studyArea = sim$studyArea,
+    destinationPath = mod$dPath,
+    filename2 = NULL
+  ) |>
+    Cache(useCache = P(sim)$.useCache)
 
-  sim$rasterToMatchLarge <- Cache(LandR::prepInputsLCC,
-                                  year = 2005,
-                                  studyArea = sim$studyAreaLarge,
-                                  destinationPath = mod$dPath,
-                                  useCache = P(sim)$.useCache,
-                                  filename2 = NULL)
+  sim$rasterToMatchLarge <- LandR::prepInputsLCC(
+    year = 2005,
+    studyArea = sim$studyAreaLarge,
+    destinationPath = mod$dPath,
+    filename2 = NULL
+  ) |>
+    Cache(useCache = P(sim)$.useCache)
 
-  sim$rasterToMatchReporting <- Cache(LandR::prepInputsLCC,
-                                      year = 2005,
-                                      studyArea = sim$studyAreaReporting,
-                                      destinationPath = mod$dPath,
-                                      useCache = P(sim)$.useCache,
-                                      filename2 = NULL)
+  sim$rasterToMatchReporting <- LandR::prepInputsLCC(
+    year = 2005,
+    studyArea = sim$studyAreaReporting,
+    destinationPath = mod$dPath,
+    filename2 = NULL
+  ) |>
+    Cache(useCache = P(sim)$.useCache)
 
   if (P(sim)$.resolution == 125L) {
     sim$rasterToMatch <- terra::disagg(sim$rasterToMatch, fact = 2)
@@ -387,13 +390,15 @@ InitStudyAreaLCC <- function(sim) {
     remapDT[is.na(LCC2005) & LCC_FRI %in% 10, newLCC := 99] ## reclassification needed
     remapDT[LCC2005 %in% treeClassesToReplace, newLCC := 99] ## reclassification needed
 
-    sim$rstLCC2001 <- Cache(overlayLCCs,
-                            LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
-                            forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
-                            outputLayer = "LCC2005",
-                            remapTable = remapDT,
-                            classesToReplace = c(treeClassesToReplace, 99),
-                            availableERC_by_Sp = NULL)
+    sim$rstLCC2001 <- overlayLCCs(
+      LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
+      forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
+      outputLayer = "LCC2005",
+      remapTable = remapDT,
+      classesToReplace = c(treeClassesToReplace, 99),
+      availableERC_by_Sp = NULL
+    ) |>
+      Cache()
 
     sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
 
@@ -419,14 +424,14 @@ InitStudyAreaLCC <- function(sim) {
     LCC_FN[as.vector(values(LCC_FN)) <= 0] <- NA_integer_ ## remove 0, -9, and -99
     LCC_FN[as.vector(values(LCC_FN)) > 24] <- NA_integer_ ## remove >24
 
-    LCC_FN <- Cache(
-      postProcess,
+    LCC_FN <- postProcess(
       LCC_FN,
       method = "ngb",
       to = sim$rasterToMatchLarge,
       destinationPath = mod$dPath,
-      filename2 = file.path(mod$dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
-    )
+      writeTo = file.path(mod$dPath, paste0("FarNorth_LandCover_Class_", P(sim)$studyAreaName, ".tif"))
+    ) |>
+      Cache()
 
     ## LandR forest classes are distinct from fireSense forest classes, in that fireSense assesses
     ## forest by the dominant species composition (i.e. fuel class) and not the landcover.
@@ -449,13 +454,14 @@ InitStudyAreaLCC <- function(sim) {
     # "Agriculture" = 24, "Cloud/Shadow" = -9, "Other" = -99
 
     nIterations <- ifelse(grepl("ROF_shield", P(sim)$studyAreaName), 3, 3) ## TODO: revisit this
-    LCC_FN <- Cache(LandR::convertUnwantedLCC2,
-                    classesToReplace = 19:20,
-                    rstLCC = LCC_FN,
-                    nIterations = nIterations,
-                    defaultNewValue = 18,
-                    invalidClasses = c(1:5, 21:24),
-                    userTags = c("convertUnwantedLCC2", studyAreaName))
+    LCC_FN <- LandR::convertUnwantedLCC2(
+      classesToReplace = 19:20,
+      rstLCC = LCC_FN,
+      nIterations = nIterations,
+      defaultNewValue = 18,
+      invalidClasses = c(1:5, 21:24)
+    ) |>
+      Cache(userTags = c("convertUnwantedLCC2", studyAreaName))
 
     sim$rstLCC2001 <- LCC_FN
     sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
@@ -522,11 +528,13 @@ InitAge <- function(sim) {
 
     fireURL <- "https://cwfis.cfs.nrcan.gc.ca/downloads/nfdb/fire_poly/current_version/NFDB_poly.zip"
 
-    fireYear <- Cache(prepInputsFireYear,
-                      earliestYear = 1950,
-                      url = fireURL,
-                      destinationPath = mod$dPath,
-                      to = sim$rasterToMatchLarge)
+    fireYear <- prepInputsFireYear(
+      earliestYear = 1950,
+      url = fireURL,
+      destinationPath = mod$dPath,
+      rasterToMatch = sim$rasterToMatchLarge
+    ) |>
+      Cache()
 
     fireYear <- postProcess(fireYear, to = sim$rasterToMatchLarge) ## needed cropping
 
@@ -670,13 +678,13 @@ InitAge <- function(sim) {
 
     ## TODO: it doesn't look like Raquel's layer properly accounts for wildfire raster,
     ## so we will manually adjust it here. But the age map needs to be fixed in ROF_age and rebuilt.
-    wildfires <- Cache(
-      prepInputs,
+    wildfires <- prepInputs(
       url = "https://drive.google.com/file/d/1WcxdP-wyHBCnBO7xYGZ0qKgmvqvOzmxp/",
       targetFile = "wildfire_ROF.tif",
       destinationPath = mod$dPath,
       to = sim$rasterToMatch
-    )
+    ) |>
+      Cache()
     wildfires <- wildfires2001 <- wildfires2011 <- as.int(wildfires)
     wildfires2001[as.vector(values(wildfires)) > 2001] <- NA
     wildfires2011[as.vector(values(wildfires)) > 2011] <- NA
@@ -713,10 +721,12 @@ InitFirePolys <- function(sim) {
     url = NULL,
     destinationPath = mod$dPath,
     studyArea = sim$studyAreaLarge,
-    type = P(sim)$fireRegimePolysType,
-    useCache = FALSE,
-    userTags = c(cacheTags, "fireRegimePolysLarge")
-  )
+    type = P(sim)$fireRegimePolysType
+  ) |>
+    Cache(
+      useCache = FALSE,
+      userTags = c(cacheTags, "fireRegimePolysLarge")
+    )
   sim$fireRegimePolys <- postProcessTo(sim$fireRegimePolysLarge, to = sim$studyArea)
 
   return(invisible(sim))
