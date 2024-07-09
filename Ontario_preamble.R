@@ -12,7 +12,7 @@ defineModule(sim, list(
     person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
-  version = list(Ontario_preamble = "2.0.1"),
+  version = list(Ontario_preamble = "2.0.2"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -59,6 +59,8 @@ defineModule(sim, list(
                   desc = "the corresponding fire regime for `studyArea`."),
     createsOutput("fireRegimePolysLarge", "sf",
                   desc = "the corresponding fire regime for `studyAreaLarge`."),
+    createsOutput("fireReturnInterval", "SpatRaster",
+                  "dummy fire return interval map, used only to satisfy `timeSinceFire` dependencies."),
     createsOutput("fireSenseForestedLCC", "integer",
                   desc = "vector of LCC classes considered to be forested by fireSense."),
     createsOutput("flammableRTM", "SpatRaster",
@@ -147,6 +149,7 @@ doEvent.Ontario_preamble = function(sim, eventTime, eventType) {
       sim <- InitStudyAreaRTM(sim)
       sim <- InitStudyAreaLCC(sim)
       sim <- InitAge(sim)
+      sim <- InitFlammableMaps(sim)
       sim <- InitFirePolys(sim)
 
       ## check GIS
@@ -504,12 +507,6 @@ InitStudyAreaLCC <- function(sim) {
   sim$nonTreePixels <- nonTreePixels
   sim$treeClasses <- sim$LandRforestedLCC
   sim$nontreeClasses <- nontreeClassesLCC
-  sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
-                                      nonFlammClasses = sim$nonflammableLCC,
-                                      mask = sim$rasterToMatch)
-  sim$flammableRTML <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatchLarge),
-                                       nonFlammClasses = sim$nonflammableLCC,
-                                       mask = sim$rasterToMatchLarge)
 
   # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
   fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
@@ -518,6 +515,25 @@ InitStudyAreaLCC <- function(sim) {
          "Expected: ", allClasses, "\n",
          "Assigned to fireSense classes: ", fS_classes)
   }
+
+  return(invisible(sim))
+}
+
+InitFlammableMaps <- function(sim) {
+  message("Preparing flammability maps...")
+  sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
+                                      nonFlammClasses = sim$nonflammableLCC,
+                                      mask = sim$rasterToMatch)
+  sim$flammableRTML <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatchLarge),
+                                       nonFlammClasses = sim$nonflammableLCC,
+                                       mask = sim$rasterToMatchLarge)
+
+  message("Preparing dummy fire return interval map...")
+  ## NOTE: this is only needed to satisfy timeSinceFire; not actually used
+  dummyFireReturnInterval <- terra::deepcopy(sim$flammableRTM)
+  dummyFireReturnInterval[dummyFireReturnInterval[] == 1L] <- 70L
+
+  sim$fireReturnInterval <- dummyFireReturnInterval
 
   return(invisible(sim))
 }
