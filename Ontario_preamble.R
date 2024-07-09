@@ -350,7 +350,7 @@ InitStudyAreaLCC <- function(sim) {
       filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
       fun = "terra::rast",
       method = "near",
-      rasterToMatch = sim$rasterToMatchLarge
+      to = sim$rasterToMatchLarge
     )
     LCC_FRI <- setMinMax(LCC_FRI)
 
@@ -523,7 +523,7 @@ InitAge <- function(sim) {
                       earliestYear = 1950,
                       url = fireURL,
                       destinationPath = mod$dPath,
-                      rasterToMatch = sim$rasterToMatchLarge)
+                      to = sim$rasterToMatchLarge)
 
     fireYear <- postProcess(fireYear, to = sim$rasterToMatchLarge) ## needed cropping
 
@@ -672,7 +672,7 @@ InitAge <- function(sim) {
       url = "https://drive.google.com/file/d/1WcxdP-wyHBCnBO7xYGZ0qKgmvqvOzmxp/",
       targetFile = "wildfire_ROF.tif",
       destinationPath = mod$dPath,
-      rasterToMatch = sim$rasterToMatch
+      to = sim$rasterToMatch
     )
     wildfires <- wildfires2001 <- wildfires2011 <- as.int(wildfires)
     wildfires2001[as.vector(values(wildfires)) > 2001] <- NA
@@ -700,7 +700,8 @@ InitAge <- function(sim) {
 }
 
 InitFirePolys <- function(sim) {
-  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitFirePolys", P(sim)$fireRegimePolysType)
+  cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitFirePolys",
+                 P(sim)$fireRegimePolysType)
 
   message("Preparing fire polygons for scfm...")
 
@@ -713,7 +714,7 @@ InitFirePolys <- function(sim) {
     useCache = FALSE,
     userTags = c(cacheTags, "fireRegimePolysLarge")
   )
-  sim$fireRegimePolys <- postProcess(sim$fireRegimePolysLarge, studyArea = sim$studyArea)
+  sim$fireRegimePolys <- postProcessTo(sim$fireRegimePolysLarge, to = sim$studyArea)
 
   return(invisible(sim))
 }
