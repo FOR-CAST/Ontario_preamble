@@ -12,7 +12,7 @@ defineModule(sim, list(
     person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
-  version = list(Ontario_preamble = "2.0.0"),
+  version = list(Ontario_preamble = "2.0.1"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
