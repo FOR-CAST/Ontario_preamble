@@ -283,7 +283,7 @@ InitStudyAreaRTM <- function(sim) {
       url = "https://drive.google.com/file/d/1DzVRglqJNvZA8NZZ7XKe3-6Q5f8tlydQ",
       targetFile = "ROF_RA_def.shp", alsoExtract = "similar",
       fun = "sf::st_read", destinationPath = mod$dPath,
-      filename2 = "ROF_RA_def", overwrite = TRUE
+      writeTo = "ROF_RA_def", overwrite = TRUE
     ) |>
       st_transform(crs = mod$targetCRS)
 
@@ -301,7 +301,7 @@ InitStudyAreaRTM <- function(sim) {
     year = 2005,
     to = sim$studyArea,
     destinationPath = mod$dPath,
-    filename2 = NULL
+    writeTo = NULL
   ) |>
     Cache(useCache = P(sim)$.useCache)
 
@@ -309,7 +309,7 @@ InitStudyAreaRTM <- function(sim) {
     year = 2005,
     to = sim$studyAreaLarge,
     destinationPath = mod$dPath,
-    filename2 = NULL
+    writeTo = NULL
   ) |>
     Cache(useCache = P(sim)$.useCache)
 
@@ -317,7 +317,7 @@ InitStudyAreaRTM <- function(sim) {
     year = 2005,
     to = sim$studyAreaReporting,
     destinationPath = mod$dPath,
-    filename2 = NULL
+    writeTo = NULL
   ) |>
     Cache(useCache = P(sim)$.useCache)
 
@@ -364,7 +364,7 @@ InitStudyAreaLCC <- function(sim) {
       url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
       destinationPath = mod$dPath,
       filename1 = "lcc_fri_ceon_250m.tif",
-      filename2 = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
+      writeTo = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
       fun = "terra::rast",
       method = "near",
       to = sim$rasterToMatchLarge
@@ -572,7 +572,7 @@ InitAge <- function(sim) {
       fireFun = "terra::vect",
       firePerimeters = fireYear,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName))
+      writeTo = .suffix("standAgeMap_2001.tif", paste0("_", P(sim)$studyAreaName))
     )
 
     standAgeMap2011 <- LandR::prepInputsStandAgeMap(
@@ -585,7 +585,7 @@ InitAge <- function(sim) {
       fireFun = "terra::vect",
       firePerimeters = fireYear,
       fireURL = fireURL,
-      filename2 = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName))
+      writeTo = .suffix("standAgeMap_2011.tif", paste0("_", P(sim)$studyAreaName))
     )
 
     ## stand age maps already adjusted within fire polygons using LandR::prepInputsStandAgeMap.
@@ -610,7 +610,7 @@ InitAge <- function(sim) {
         url = "https://drive.google.com/file/d/1NGGUQi-Un6JGjV6HdIkGzjPd1znHFvBi",
         destinationPath = mod$dPath,
         filename1 = "age_fri_ceon_250m.tif",
-        filename2 = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
+        writeTo = paste0("age_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
         fun = "terra::rast", method = "bilinear", datatype = "INT2U",
         to = sim$rasterToMatchLarge,
         userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim))
@@ -619,7 +619,7 @@ InitAge <- function(sim) {
         url = "https://drive.google.com/file/d/1hl3NDAdA9qcLMUlVrWvszdmHy48d2L1O",
         destinationPath = mod$dPath,
         filename1 = "reference_year_fri_ceon_250m.tif",
-        filename2 = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
+        writeTo = paste0("reference_year_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
         fun = "terra::rast", method = "bilinear", datatype = "INT2U",
         to = sim$rasterToMatchLarge,
         userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim))
@@ -632,7 +632,7 @@ InitAge <- function(sim) {
           url = "https://drive.google.com/file/d/1l0_tx4_fwFZ5RExspBr08ETQDtr0HrXr",
           destinationPath = mod$dPath,
           filename1 = "age_fri_rof_125m.tif",
-          filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
+          writeTo = paste0("age_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
           to = sim$rasterToMatchLarge,
           userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim))
@@ -641,7 +641,7 @@ InitAge <- function(sim) {
           url = "https://drive.google.com/file/d/1ApBDUW4nei6pl19IQh5pe8UfalTH4xgs",
           destinationPath = mod$dPath,
           filename1 = "reference_year_fri_rof_125m.tif",
-          filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
+          writeTo = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_125m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
           to = sim$rasterToMatchLarge,
           userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim))
@@ -651,7 +651,7 @@ InitAge <- function(sim) {
           url = "https://drive.google.com/file/d/1AIjLN9V80ln23hr_ECsEqWkcP0UNQetl",
           destinationPath = mod$dPath,
           filename1 = "age_fri_rof_250m.tif",
-          filename2 = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
+          writeTo = paste0("age_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
           to = sim$rasterToMatchLarge,
           userTags = c("standAgeMapFRI", P(sim)$studyAreaName, currentModule(sim))
@@ -660,7 +660,7 @@ InitAge <- function(sim) {
           url = "https://drive.google.com/file/d/1OaioZX4ZEVJPfeqg9BNbl9N1avHFY82F",
           destinationPath = mod$dPath,
           filename1 = "reference_year_fri_rof_250m.tif",
-          filename2 = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
+          writeTo = paste0("reference_year_fri_rof_", P(sim)$studyAreaName, "_250m.tif"),
           fun = "terra::rast", method = "bilinear", datatype = "INT2U",
           to = sim$rasterToMatchLarge,
           userTags = c("refYearMapFRI", P(sim)$studyAreaName, currentModule(sim))
