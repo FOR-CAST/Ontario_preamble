@@ -12,7 +12,7 @@ defineModule(sim, list(
     person("Ian", "Eddy", email = "ian.eddy@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
-  version = list(Ontario_preamble = "2.0.2"),
+  version = list(Ontario_preamble = "2.0.3"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
@@ -67,6 +67,16 @@ defineModule(sim, list(
                   desc = "RTM without ice/rocks/urban/water. Flammable map with 0 and 1."),
     createsOutput("flammableRTML", "SpatRaster",
                   desc = "RTML without ice/rocks/urban/water. Flammable map with 0 and 1."),
+    createsOutput("imputedPixID2001", "integer",
+                  paste("A vector of pixel IDs - matching rasterMatch IDs - that suffered data imputation.",
+                        "Data imputation may be in age (to match last fire event post 1950s, or 0 cover),",
+                        "biomass (to match fire-related imputed ages, correct for missing values or for 0 age/cover),",
+                        "land cover (to convert non-forested classes into to nearest forested class)")),
+    createsOutput("imputedPixID2011", "integer",
+                  paste("A vector of pixel IDs - matching rasterMatch IDs - that suffered data imputation.",
+                        "Data imputation may be in age (to match last fire event post 1950s, or 0 cover),",
+                        "biomass (to match fire-related imputed ages, correct for missing values or for 0 age/cover),",
+                        "land cover (to convert non-forested classes into to nearest forested class)")),
     createsOutput("missingLCCgroup", "character",
                   desc = "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
     # createsOutput("ml", "map",
@@ -90,6 +100,9 @@ defineModule(sim, list(
     createsOutput("rstLCC2011", "SpatRaster",
                   desc = "Land cover classification map, derived from national LCC 2005 product and ON FRI data."),
     createsOutput("rstTimeSinceFire", "SpatRaster", desc = NA),
+    createsOutput("speciesParams", "list",
+                  desc = paste("list of updated species trait values to be used to update",
+                               "`speciesTable` to create `species`.")),
     createsOutput("speciesTable", "data.table",
                   desc = paste("a table of invariant species traits with the following trait colums:",
                                "'species', 'Area', 'longevity', 'sexualmature', 'shadetolerance',",
@@ -201,6 +214,19 @@ InitSpecies <- function(sim) {
 
   sim$speciesTable <- getSpeciesTable(dPath = mod$dPath) ## uses default URL
 
+  ## override default LANDIS-II/LandR species parameters
+  sim$speciesParams <- list(
+    longevity = list(
+      Thuj_sp = 700L ## default 700; LandR::speciesTableUpdate sets 1500 (too high!)
+    ),
+    shadetolerance = list(
+      Abie_bal = 5, ## restore default (5) for ABIE.BAL; LandR::speciesTableUpdate sets 3
+      Pice_gla = 3, ## restore default (3) for PICE.GLA; LandR::speciesTableUpdate sets 2
+      Pice_mar = 4, ## restore default (4) for PICE.MAR; LandR::speciesTableUpdate sets 3
+      Pinu_ban = 2 ## default (1) means no seed regen in empty pixels (serotiny regen only)
+    )
+  )
+
   return(invisible(sim))
 }
 
@@ -209,7 +235,6 @@ InitStudyAreaRTM <- function(sim) {
 
   stopifnot(P(sim)$.resolution %in% c(125, 250))
 
-  # # ! ----- EDIT BELOW ----- ! #
   ## provincial boundary
   mod$ON <- geodata::gadm(country = "CAN", level = 1, path = mod$dPath) |>
     sf::st_as_sf() |>
@@ -334,7 +359,6 @@ InitStudyAreaRTM <- function(sim) {
   writeRaster(sim$rasterToMatchReporting,  file.path(mod$dPath, paste0(P(sim)$studyAreaName, "_rtmr.tif")),
               datatype = "INT1U", overwrite = TRUE)
 
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
@@ -730,6 +754,9 @@ InitAge <- function(sim) {
   attr(sim$standAgeMap2011, "imputedPixID") <- imputedPixID2011
 
   sim$rstTimeSinceFire <- terra::crop(sim$standAgeMap2001, sim$rasterToMatch)
+
+  sim$imputedPixID2001 <- imputedPixID2001
+  sim$imputedPixID2011 <- imputedPixID2011
 
   return(invisible(sim))
 }
