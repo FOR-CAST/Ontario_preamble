@@ -78,12 +78,12 @@ defineModule(sim, list(
                         "biomass (to match fire-related imputed ages, correct for missing values or for 0 age/cover),",
                         "land cover (to convert non-forested classes into to nearest forested class)")),
     createsOutput("missingLCCgroup", "character",
-                  desc = "the group in `nonForestLCCGroups` that describes forested pixels omitted by LandR"),
+                  desc = "the group in `nonForestedLCCGroups` that describes forested pixels omitted by LandR"),
     # createsOutput("ml", "map",
     #               desc = "`map` object containing study areas, reporting polygons, etc. for post-processing."),
     createsOutput("nonflammableLCC", "integer",
                   desc = "vector of LCC classes considered to be non-flammable"),
-    createsOutput("nonForestLCCGroups", "list",
+    createsOutput("nonForestedLCCGroups", "list",
                   desc = "named list of non-forested landcover groups for fireSense"),
     createsOutput("nontreeClasses", "integer",
                   desc = "vector of LCC classes considered to be non-forested/treed."), ## TODO what is this used for?
@@ -242,16 +242,10 @@ InitStudyAreaRTM <- function(sim) {
     sf::st_transform(mod$targetCRS)
 
   ## FIRE REGIME TYPES
-  frtPolys <- prepInputs(
-    url = "https://zenodo.org/record/4458156/files/FRT.zip",
-    targetFile = "FRT_Canada.shp",
-    alsoExtract = "similar",
-    fun = "sf::st_read",
-    destinationPath = mod$dPath
+  frtPolys <- scfmutils::prepInputsFireRegimePolys(
+    destinationPath = mod$dPath,
+    type = "FRT"
   ) |>
-    dplyr::rename(FRT = Cluster) |>
-    subset(x = _, FRT == mod$frt) |>
-    dplyr::mutate(FRT = as.factor(FRT)) |>
     st_transform(crs = mod$targetCRS)
 
   ## STUDY AREA
@@ -370,85 +364,121 @@ InitStudyAreaLCC <- function(sim) {
   allClasses <- if (grepl("ROF", mod$studyAreaNameShort)) {
     c(1:18, 21:24) ## classes 19 and 20 reclassified
   } else {
-    1:39
+    # 1:39 ## LCC2005
+    c(20, 31, 32, 33, 40, 50, 80, 81, 100, 210, 220, 230, 240, NA) ## NTEMS
   }
 
   ## LANDCOVER MAPS (LCC2005 + FRI if AOU; Far North if ROF)
   if (mod$studyAreaNameShort == "AOU") {
-    LCC2005 <- prepInputsLCC(year = 2005,
-                             to = sim$rasterToMatchLarge,
-                             destinationPath = mod$dPath)
+    ## previously using LCC2005:
+    # LCC2005 <- prepInputsLCC(year = 2005,
+    #                          to = sim$rasterToMatchLarge,
+    #                          destinationPath = mod$dPath)
+    # uniqueLCCclasses <- na.omit(unique(as.vector(values(LCC2005))))
+    # treeClassesLCC <- c(1:15, 20, 32, 34:35) ## LCC2005
+    # nontreeClassesLCC <- allClasses[!(allClasses %in% treeClassesLCC)] ## LCC2005
 
-    uniqueLCCclasses <- na.omit(unique(as.vector(values(LCC2005))))
-
-    treeClassesLCC <- c(1:15, 20, 32, 34:35)
-    nontreeClassesLCC <- (1:39)[!(1:39 %in% treeClassesLCC)]
-
-    LCC_FRI <- prepInputs(
-      url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
-      destinationPath = mod$dPath,
-      filename1 = "lcc_fri_ceon_250m.tif",
-      writeTo = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
-      fun = "terra::rast",
-      method = "near",
-      to = sim$rasterToMatchLarge
+    ## use NTEMS LCC (for downstream modules to work)
+    LCC2001 <- LandR::prepInputs_NTEMS_LCC_FAO(
+      year = 2001,
+      cropTo = sim$rasterToMatchLarge,
+      MaksTo = sim$rasterToMatchLarge,
+      projectTo = sim$rasterToMatchLarge,
+      destinationPath = mod$dPath
     )
-    LCC_FRI <- setMinMax(LCC_FRI)
 
-    ###### FRI LANDCOVER CLASSES
-    ## 1 - water
-    ## 2 - developed agricultural land
-    ## 3 - grass and meadow
-    ## 4 - small island
-    ## 5 - unclassified
-    ## 6 - brush and alder
-    ## 7 - rock
-    ## 8 - treed wetland
-    ## 9 - open wetland
-    ## 10 - forested
-    nontreeClassesFRI <- 1:9
-    treeClassesFRI <- 10
-    treePixelsFRI_TF <- as.vector(values(LCC_FRI)) %in% treeClassesFRI
-    LandTypeFRI_NA <- is.na(as.vector(values(LCC_FRI)))
-    noDataPixelsFRI <- LandTypeFRI_NA
-    treePixelsCC <- which(treePixelsFRI_TF)
+    LCC2011 <- LandR::prepInputs_NTEMS_LCC_FAO(
+      year = 2011,
+      cropTo = sim$rasterToMatchLarge,
+      MaksTo = sim$rasterToMatchLarge,
+      projectTo = sim$rasterToMatchLarge,
+      destinationPath = mod$dPath
+    )
 
-    ## for each LCC2005 + LCC_FRI class combo, define which LCC2005 code should be used
-    ## remember, setting a pixel to NA will omit it entirely (i.e., non-vegetated)
-    treeClassesToReplace <- c(34:35)
-    remapDT <- as.data.table(expand.grid(LCC2005 = c(NA_integer_, sort(uniqueLCCclasses)),
-                                         LCC_FRI = c(NA_integer_, 1:10)))
-    remapDT[LCC2005 == 0, newLCC := NA_integer_]
-    remapDT[is.na(LCC_FRI), newLCC := LCC2005]
-    remapDT[LCC_FRI %in% c(1, 5, 7), newLCC := NA_integer_]
-    remapDT[LCC_FRI %in% c(2, 3, 6, 8, 9, 10), newLCC := LCC2005]
-    remapDT[is.na(LCC2005) & LCC_FRI %in% 10, newLCC := 99] ## reclassification needed
-    remapDT[LCC2005 %in% treeClassesToReplace, newLCC := 99] ## reclassification needed
+    uniqueLCCclasses <- na.omit(unique(as.vector(values(LCC2001)))) |> sort()
 
-    sim$rstLCC2001 <- overlayLCCs(
-      LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
-      forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
-      outputLayer = "LCC2005",
-      remapTable = remapDT,
-      classesToReplace = c(treeClassesToReplace, 99),
-      availableERC_by_Sp = NULL
-    ) |>
-      Cache()
+    treeClassesLCC <- c(81, 210, 220, 230, 240) ## NTEMS (includes wetland forest)
+    nontreeClassesLCC <- allClasses[!(allClasses %in% treeClassesLCC)] ## NTEMS
 
-    sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
+    sim$rstLCC2001 <- LCC2001
+    sim$rstLCC2011 <- LCC2011
 
-    treePixelsLCC <- which(as.vector(values(sim$rstLCC2001)) %in% treeClassesLCC) ## c(1:15, 20, 32, 34:35)
+    ## NOTE: no longer using LCC FRI; NTEMS only to work with downstream modules
+    if (FALSE) {
+      LCC_FRI <- prepInputs(
+        url = "https://drive.google.com/file/d/1eg9yhkAKDsQ8VO5Nx4QjBg4yiB0qyqng",
+        destinationPath = mod$dPath,
+        filename1 = "lcc_fri_ceon_250m.tif",
+        writeTo = paste0("lcc_fri_ceon_", P(sim)$studyAreaName, "_250m.tif"),
+        fun = "terra::rast",
+        method = "near",
+        to = sim$rasterToMatchLarge
+      )
+      LCC_FRI <- setMinMax(LCC_FRI)
+
+      ###### FRI LANDCOVER CLASSES
+      ## 1 - water
+      ## 2 - developed agricultural land
+      ## 3 - grass and meadow
+      ## 4 - small island
+      ## 5 - unclassified
+      ## 6 - brush and alder
+      ## 7 - rock
+      ## 8 - treed wetland
+      ## 9 - open wetland
+      ## 10 - forested
+      nontreeClassesFRI <- 1:9
+      treeClassesFRI <- 10
+      treePixelsFRI_TF <- as.vector(values(LCC_FRI)) %in% treeClassesFRI
+      LandTypeFRI_NA <- is.na(as.vector(values(LCC_FRI)))
+      noDataPixelsFRI <- LandTypeFRI_NA
+      treePixelsCC <- which(treePixelsFRI_TF)
+
+      ## for each LCC2005 + LCC_FRI class combo, define which LCC2005 code should be used
+      ## remember, setting a pixel to NA will omit it entirely (i.e., non-vegetated)
+      treeClassesToReplace <- c(34:35)
+      remapDT <- as.data.table(expand.grid(LCC2005 = c(NA_integer_, sort(uniqueLCCclasses)),
+                                           LCC_FRI = c(NA_integer_, 1:10)))
+      remapDT[LCC2005 == 0, newLCC := NA_integer_]
+      remapDT[is.na(LCC_FRI), newLCC := LCC2005]
+      remapDT[LCC_FRI %in% c(1, 5, 7), newLCC := NA_integer_]
+      remapDT[LCC_FRI %in% c(2, 3, 6, 8, 9, 10), newLCC := LCC2005]
+      remapDT[is.na(LCC2005) & LCC_FRI %in% 10, newLCC := 99] ## reclassification needed
+      remapDT[LCC2005 %in% treeClassesToReplace, newLCC := 99] ## reclassification needed
+
+      sim$rstLCC2001 <- overlayLCCs(
+        LCCs = list(LCC_FRI = LCC_FRI, LCC2005 = LCC2005),
+        forestedList = list(LCC_FRI = 10, LCC2005 = treeClassesLCC),
+        outputLayer = "LCC2005",
+        remapTable = remapDT,
+        classesToReplace = c(treeClassesToReplace, 99),
+        availableERC_by_Sp = NULL
+      ) |>
+        Cache()
+
+      sim$rstLCC2011 <- terra::deepcopy(sim$rstLCC2001) ## TODO: prepare rstLCC2011 differently?
+    }
+
+    treePixelsLCC <- which(as.vector(values(sim$rstLCC2001)) %in% treeClassesLCC)
     nonTreePixels <- which(as.vector(values(sim$rstLCC2001)) %in% nontreeClassesLCC)
 
-    fireSenseForestedLCC <- LandRforestedLCC <- treeClassesLCC
+    LandRforestedLCC <- treeClassesLCC
+    fireSenseForestedLCC <- treeClassesLCC
     sim$nonForestClasses <- nontreeClassesLCC
 
-    nonflammableLCC  <- c(0, 25, 30, 33, 36:39)
-    nonForestLCCGroups <- list(
-      nonForest_highFlam = c(16:19, 22),
-      nonForest_lowFlam = c(21, 23:24, 26:29, 31)
+    # nonflammableLCC <- c(0, 25, 30, 33, 36:39)    ## LCC2005
+    # nonForestedLCCGroups <- list(
+    #   nonForest_highFlam = c(16:19, 22),          ## LCC2005
+    #   nonForest_lowFlam = c(21, 23:24, 26:29, 31) ## LCC2005
+    # )
+    # sim$missingLCCGroup <- "nonForest_highFlam"   ## LCC2005
+
+    nonflammableLCC <- c(20, 31, 32, 33, 80) ## NTEMS
+    nonForestedLCCGroups <- list(
+      nf_highFlam = c(50, 100), ## shrubs + herbaceous
+      nf_lowFlam = c(40, 80)    ## bryoids + non-treed wetland
     )
-    sim$missingLCCGroup <- "nonForest_highFlam"
+    sim$missingLCCGroup <- "nf_highFlam"
   } else if (grepl("ROF", mod$studyAreaNameShort)) {
     ## FAR NORTH LANDCOVER (620 MB)
     ## unable to download directly b/c of SSL, time outs, and other server problems
@@ -514,7 +544,7 @@ InitStudyAreaLCC <- function(sim) {
 
     fireSenseForestedLCC <- c(15:18)
     nonflammableLCC <- c(1:6, 21:23, 24) ## TODO: reassess agriculture class 24
-    nonForestLCCGroups <- list(
+    nonForestedLCCGroups <- list(
       "FenPlus" = c(7:8, 10:12),
       "BogSwamp" = c(9, 13:14)
     )
@@ -525,19 +555,26 @@ InitStudyAreaLCC <- function(sim) {
   sim$rstLCC2011 <- setValues(sim$rstLCC2011, asInteger(as.vector(values(sim$rstLCC2011))))
   sim$LandRforestedLCC <- LandRforestedLCC
   sim$fireSenseForestedLCC <- fireSenseForestedLCC
-  sim$nonForestLCCGroups <- nonForestLCCGroups
+  sim$nonForestedLCCGroups <- nonForestedLCCGroups
   sim$nonflammableLCC <- nonflammableLCC
 
   sim$nonTreePixels <- nonTreePixels
   sim$treeClasses <- sim$LandRforestedLCC
   sim$nontreeClasses <- nontreeClassesLCC
 
-  # check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
-  fS_classes <- sort(unique(c(sim$fireSenseForestedLCC, unlist(sim$nonForestLCCGroups), sim$nonflammableLCC)))
-  if (!all(allClasses %in% fS_classes)) {
+  ## check that all LCC classes accounted for in forest, nonForest, and non flamm classes for fS
+  fS_classes <- c(
+    sim$fireSenseForestedLCC,
+    unlist(sim$nonForestedLCCGroups),
+    sim$nonflammableLCC
+  ) |>
+    unique() |>
+    sort()
+
+  if (!all(na.omit(allClasses) %in% fS_classes)) {
     stop("Some LCCs not accounted for:\n",
-         "Expected: ", allClasses, "\n",
-         "Assigned to fireSense classes: ", fS_classes)
+         "Expected: ", paste(allClasses, collapse = ", "), "\n",
+         "Assigned to fireSense classes: ", paste(fS_classes, collapse = ", "))
   }
 
   return(invisible(sim))
@@ -566,6 +603,7 @@ InitAge <- function(sim) {
   cacheTags <- c(currentModule(sim), P(sim)$studyAreaName, "function:InitAge")
 
   ## STAND AGE MAP (TIME SINCE DISTURBANCE)
+  ## TODO: replace kNN age map with NTEMS-derived one
   if (isTRUE(P(sim)$useAgeMapkNN)) {
     standAgeMapURL2001 <- paste0(
       "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
@@ -766,7 +804,7 @@ InitFirePolys <- function(sim) {
                  P(sim)$fireRegimePolysType)
 
   message("Preparing fire polygons for scfm...")
-
+  ## TODO: 'large' now called 'calibration'
   sim$fireRegimePolysLarge <- Cache(
     scfmutils::prepInputsFireRegimePolys,
     url = NULL,
