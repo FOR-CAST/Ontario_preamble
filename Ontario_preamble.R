@@ -316,6 +316,7 @@ InitStudyAreaRTM <- function(sim) {
   sim$studyAreaReporting <- studyAreaReporting
 
   ## RASTERS TO MATCH
+  ## TODO: use NTEMS product (30m)
   sim$rasterToMatch <- LandR::prepInputsLCC(
     year = 2005,
     to = sim$studyArea,
@@ -582,12 +583,25 @@ InitStudyAreaLCC <- function(sim) {
 
 InitFlammableMaps <- function(sim) {
   message("Preparing flammability maps...")
-  sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
-                                      nonFlammClasses = sim$nonflammableLCC,
-                                      mask = sim$rasterToMatch)
-  sim$flammableRTML <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatchLarge),
-                                       nonFlammClasses = sim$nonflammableLCC,
-                                       mask = sim$rasterToMatchLarge)
+  # sim$flammableRTM <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatch),
+  #                                     nonFlammClasses = sim$nonflammableLCC,
+  #                                     mask = sim$rasterToMatch)
+  # sim$flammableRTML <- defineFlammable(crop(sim$rstLCC2001, sim$rasterToMatchLarge),
+  #                                      nonFlammClasses = sim$nonflammableLCC,
+  #                                      mask = sim$rasterToMatchLarge)
+
+  ## make flammable maps following recipe in scfmLandCoverInit
+  rstFlammableLarge <- defineFlammable(sim$rstLCC2001, nonFlammClasses = c(20, 31, 32, 33))
+  rstFlammableLarge <- postProcess(rstFlammableLarge,
+                                   to = sim$rasterToMatchLarge,
+                                   method = "average")
+  rstFlammableLarge[] <- LandR::asInteger(rstFlammableLarge[] > 0.25) ## TODO: flammThresh param 0.25
+  rstFlammableLarge <- terra::sieve(rstFlammableLarge, 8) ## TODO: 125*125/10^4 * 8 = 50 ha
+  sim$flammableRTML <- rstFlammableLarge ## TODO: use synonym?
+
+  sim$flammableRTM <- postProcessTo(rstFlammableLarge, sim$rasterToMatch, method = "near")
+  sim$flammableRTM[is.nan(sim$flammableRTM[])] <- NA
+  sim$flammableMap <- sim$flammableRTM ## TODO: use synonym?
 
   message("Preparing dummy fire return interval map...")
   ## NOTE: this is only needed to satisfy timeSinceFire; not actually used
