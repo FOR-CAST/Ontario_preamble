@@ -49,11 +49,11 @@ jobs:
             libxml2-dev \
             python3-gdal
 
-      - uses: PredictiveEcology/actions/install-Require@v0
+      - uses: PredictiveEcology/actions/install-Require
         with:
-          GitTag: '5c44205bf407f613f53546be652a438ef1248147'
+          GitTag: 'development'
 
-      - uses: PredictiveEcology/actions/install-SpaDES@v0
+      - uses: PredictiveEcology/actions/install-SpaDES
 
       - uses: PredictiveEcology/actions/install-Rmd-pkgs@v0
 
